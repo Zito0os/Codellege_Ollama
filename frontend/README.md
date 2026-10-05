@@ -34,3 +34,7 @@ FLUJO
 -En base a eso generara una respuesta la cual seria una receta que se ajuste a las especificaciones del cliente 
 -El maximo de recetas que se pueden pedir son 4 
 -El sistema debera de entregar en total 4 respuestas si el usuario especifica que quiere ver la opcion de 2 tipos de comida tendra que manadar 2 de cada una para completar 4 
+
+
+-Hacer onboarding
+-Al inicio de la sesion tendras que especificar que herraminetas tienes y en base a eso ya no tener que poner en el prompt cada vez las herramientas que tienes
