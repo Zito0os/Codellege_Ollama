@@ -19,22 +19,14 @@ If you are developing a production application, we recommend using TypeScript wi
 
 IDEA PRINCIPAL
 --------------
-¿QUE COMERE HOY?
+¿QUE LE PASA A MI COCHE?
 
-Pagina en donde en base a parametros los cuales seran ingredientes que se ecnontraran en el refrigerados estos aun hayq ue ver si se especificaran o no , con esto tendria que darte una receta aleatoria para poder comer
+En esta pagina podras resolver problemas diversos de tu carro, asi como arreglarlo, buscar piezas, y tambien como cambiarlas mediante un formulario
 
 FLUJO
 -------------
 
--El usuario entra a la pagina y describe los ingredientes que tiene a disposicion(meter modelo de vison a futuro para automatizalo con una imagen)
--El cliente tendra que especificar las herramientas con las que cuenta (estufa microondas, etc)
--El usuario medainte un formulario especificara quie tipo de comida quiere
-    -Este sera el tipo de comida (oriental,francesa,algo rapido etc) si el usuario no especifica cual es su preferencia el sistema manda aleatorio y la opcion rapida
--El prompt reunira todas las especificaciones dadas
--En base a eso generara una respuesta la cual seria una receta que se ajuste a las especificaciones del cliente 
--El maximo de recetas que se pueden pedir son 4 
--El sistema debera de entregar en total 4 respuestas si el usuario especifica que quiere ver la opcion de 2 tipos de comida tendra que manadar 2 de cada una para completar 4 
-
-
--Hacer onboarding
--Al inicio de la sesion tendras que especificar que herraminetas tienes y en base a eso ya no tener que poner en el prompt cada vez las herramientas que tienes
+-El usuario ingresa el modelo de su carro , y el problema que quiere solucionar
+-Ingresa el nombre y selecciona uno de los 3 incisos, 1.Repara el coche, 2.Buscar el nombre de una pieza,3.Instrucciones para cambiar una pieza
+-Una vez seleccionado uno de los 3 se podra escribir una pequeña descripion del problema con el cual el prompt se terminara de armar
+-Dara el resultado pedido y la descripcion segun corresponda
