@@ -103,6 +103,8 @@ function App() {
           setProgressLabel('Ollama está generando el análisis…')
         } else if (eventData.type === 'error') {
           throw new Error(eventData.detail)
+        } else if (eventData.type === 'status') {
+          setProgressLabel(eventData.message)
         } else if (eventData.type === 'done') {
           streamFinished = true
         }
