@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
+const DEFAULT_LOCATION = 'Monterrey, N.L.'
+
 const modes = [
   { id: 'vehicle', number: '01', title: '¿Cuál es tu carro?', description: 'Identifícalo y conoce sus datos clave.', heading: 'Empecemos por conocer tu auto', prompt: 'Dime marca, modelo y año para identificarlo mejor.', button: 'Identificar auto' },
   { id: 'repair', number: '02', title: 'Reparar mi carro', description: 'Entiende una falla y qué revisar.', heading: 'Cuéntame qué le sucede', prompt: 'Describe el ruido, testigo o síntoma que notas.', button: 'Consultar reparación' },
@@ -8,12 +10,21 @@ const modes = [
   { id: 'parts', number: '04', title: 'Piezas compatibles', description: 'Busca piezas para tu modelo de auto.', heading: 'Encuentra piezas para tu auto', prompt: 'Dime qué pieza buscas y los datos de tu vehículo.', button: 'Buscar compatibilidad' },
 ]
 
+function buildNearbyMapUrl(mode, location) {
+  const placeType = mode === 'repair' ? 'talleres mecánicos' : 'refaccionarias'
+  const query = `${placeType} cerca de ${location}`
+  return `https://maps.google.com/maps?q=${encodeURIComponent(query)}&z=13&output=embed`
+}
+
 function App() {
   const [activeMode, setActiveMode] = useState('vehicle')
   const [vehicle, setVehicle] = useState({ make: '', model: '', year: '' })
   const [details, setDetails] = useState('')
+  const [location, setLocation] = useState('')
   const [lastQuestion, setLastQuestion] = useState('')
   const [answer, setAnswer] = useState('')
+  const [resultLocation, setResultLocation] = useState('')
+  const [resultMode, setResultMode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [showResult, setShowResult] = useState(false)
@@ -22,6 +33,8 @@ function App() {
 
   const selectedMode = modes.find((mode) => mode.id === activeMode)
   const vehicleDescription = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')
+  const needsNearbyMap = activeMode === 'repair' || activeMode === 'install'
+  const showNearbyMap = Boolean(answer && (resultMode === 'repair' || resultMode === 'install') && resultLocation)
   const canSubmit = activeMode === 'vehicle'
     ? Boolean(vehicle.make.trim() || vehicle.model.trim() || vehicle.year.trim())
     : activeMode === 'parts'
@@ -43,6 +56,8 @@ function App() {
     setDetails('')
     setLastQuestion('')
     setAnswer('')
+    setResultLocation('')
+    setResultMode('')
     setError('')
     setShowResult(false)
   }
@@ -52,6 +67,7 @@ function App() {
     if (!canSubmit || isLoading) return
 
     const context = vehicleDescription ? ` Vehículo: ${vehicleDescription}.` : ''
+    const resolvedLocation = location.trim() || DEFAULT_LOCATION
     let question
     if (activeMode === 'vehicle') {
       question = `Ayúdame a identificar este vehículo y dame información general útil para conocerlo. Si faltan datos, pregúntamelos. Vehículo: ${vehicleDescription}.`
@@ -66,6 +82,8 @@ function App() {
     setIsLoading(true)
     setError('')
     setAnswer('')
+    setResultLocation('')
+    setResultMode('')
     setLastQuestion(activeMode === 'vehicle' ? vehicleDescription : details.trim())
     setShowResult(true)
     setResultNavigation((current) => current + 1)
@@ -78,6 +96,10 @@ function App() {
       if (!response.ok) throw new Error('No se pudo obtener una respuesta.')
       const data = await response.json()
       setAnswer(data.answer)
+      if (activeMode === 'repair' || activeMode === 'install') {
+        setResultLocation(resolvedLocation)
+        setResultMode(activeMode)
+      }
     } catch {
       setError('No pudimos conectar con la IA. Comprueba que FastAPI y Ollama estén en ejecución.')
     } finally {
@@ -149,6 +171,19 @@ function App() {
                   </div>
                   <label className="details-label" htmlFor="vehicle-details">{activeMode === 'repair' ? '¿Qué está pasando?' : activeMode === 'install' ? '¿Qué quieres instalar?' : '¿Qué pieza necesitas?'}</label>
                   <textarea id="vehicle-details" value={details} onChange={(event) => setDetails(event.target.value)} placeholder={activeMode === 'repair' ? 'Ej. Al frenar, el auto vibra y se escucha un rechinido...' : activeMode === 'install' ? 'Ej. Quiero instalar una cámara de reversa...' : 'Ej. Busco un alternador o pastillas de freno...'} rows="3" />
+                  {needsNearbyMap && (
+                    <label className="details-label location-label" htmlFor="user-location">
+                      Ubicación <small>OPCIONAL · SI NO LA INDICAS USAMOS MONTERREY, N.L.</small>
+                      <input
+                        id="user-location"
+                        type="text"
+                        value={location}
+                        onChange={(event) => setLocation(event.target.value)}
+                        placeholder="Ej. San Pedro Garza García, N.L."
+                        autoComplete="address-level2"
+                      />
+                    </label>
+                  )}
                 </>
               )}
               <div className="form-bottom"><span className="privacy-note"><span aria-hidden="true">⌑</span> Tu información solo se usa para responderte.</span><button type="submit" disabled={!canSubmit || isLoading}>{isLoading ? 'Pensando…' : selectedMode.button}<span aria-hidden="true">↗</span></button></div>
@@ -168,6 +203,25 @@ function App() {
               {isLoading ? <div className="result-loading" role="status"><span className="loading-indicator" /><div><strong>Preparando tu respuesta</strong><p>La IA está revisando la información y organizando los pasos para ti.</p></div></div> : null}
               {error && <p className="result-error" role="alert">{error}</p>}
               {answer && <><div className="result-answer-label"><span className="answer-spark">✳</span><span>RESPUESTA DE AUTOGUÍA</span></div><div className="result-answer">{answer}</div></>}
+              {showNearbyMap && (
+                <div className="nearby-places">
+                  <div className="nearby-places-label">
+                    <span>LUGARES CERCANOS</span>
+                    <small>
+                      {resultMode === 'repair' ? 'Talleres mecánicos' : 'Refaccionarias'} cerca de {resultLocation}
+                    </small>
+                  </div>
+                  <div className="nearby-map">
+                    <iframe
+                      title={resultMode === 'repair' ? `Talleres mecánicos cerca de ${resultLocation}` : `Refaccionarias cerca de ${resultLocation}`}
+                      src={buildNearbyMapUrl(resultMode, resultLocation)}
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                      allowFullScreen
+                    />
+                  </div>
+                </div>
+              )}
               <button className="back-to-form" type="button" onClick={() => document.querySelector('.mode-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Volver a la consulta <span aria-hidden="true">↑</span></button>
             </div>
           </section>
