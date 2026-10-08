@@ -4,10 +4,10 @@ import './App.css'
 const DEFAULT_LOCATION = 'Monterrey, N.L.'
 
 const modes = [
-  { id: 'vehicle', number: '01', title: '¿Cuál es tu carro?', description: 'Identifícalo y conoce sus datos clave.', heading: 'Empecemos por conocer tu auto', prompt: 'Dime marca, modelo y año para identificarlo mejor.', button: 'Identificar auto' },
-  { id: 'repair', number: '02', title: 'Reparar mi carro', description: 'Entiende una falla y qué revisar.', heading: 'Cuéntame qué le sucede', prompt: 'Describe el ruido, testigo o síntoma que notas.', button: 'Consultar reparación' },
-  { id: 'install', number: '03', title: 'Cómo instalar algo', description: 'Sigue pasos para una instalación.', heading: '¿Qué quieres instalar?', prompt: 'Indica la pieza o accesorio y te guío paso a paso.', button: 'Ver guía de instalación' },
-  { id: 'parts', number: '04', title: 'Piezas compatibles', description: 'Busca piezas para tu modelo de auto.', heading: 'Encuentra piezas para tu auto', prompt: 'Dime qué pieza buscas y los datos de tu vehículo.', button: 'Buscar compatibilidad' },
+  { id: 'vehicle', number: '01', title: '¿Cuál es tu carro?', description: 'Identifícalo y conoce sus datos clave.', image: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=700&q=80', imageAlt: 'Automóvil deportivo para identificar', heading: 'Empecemos por conocer tu auto', prompt: 'Dime marca, modelo y año para identificarlo mejor.', button: 'Identificar auto' },
+  { id: 'repair', number: '02', title: 'Reparar mi carro', description: 'Entiende una falla y qué revisar.', image: 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=700&q=80', imageAlt: 'Mecánico revisando un automóvil', heading: 'Cuéntame qué le sucede', prompt: 'Describe el ruido, testigo o síntoma que notas.', button: 'Consultar reparación' },
+  { id: 'install', number: '03', title: 'Cómo instalar algo', description: 'Sigue pasos para una instalación.', image: 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&w=700&q=80', imageAlt: 'Trabajo de instalación con herramientas', heading: '¿Qué quieres instalar?', prompt: 'Indica la pieza o accesorio y te guío paso a paso.', button: 'Ver guía de instalación' },
+  { id: 'parts', number: '04', title: 'Piezas compatibles', description: 'Busca piezas para tu modelo de auto.', image: 'https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=700&q=80', imageAlt: 'Piezas y herramientas para automóvil', heading: 'Encuentra piezas para tu auto', prompt: 'Dime qué pieza buscas y los datos de tu vehículo.', button: 'Buscar compatibilidad' },
 ]
 
 function buildNearbyMapUrl(mode, location, place, coordinates) {
@@ -30,12 +30,88 @@ function formatAnswerText(text) {
 
   return text
     .replace(/\r\n/g, '\n')
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\n\s*\*\s*/g, '\n- ')
-    .replace(/^\s*\*\s*/gm, '- ')
-    .replace(/\n\s*-\s*/g, '\n- ')
+    .replace(/^\s*\*(?!\*)\s+/gm, '- ')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+}
+
+function renderAnswerInline(text, keyPrefix) {
+  return text.split(/(\*\*.+?\*\*|__.+?__)/g).map((part, index) => {
+    const isBold = (part.startsWith('**') && part.endsWith('**'))
+      || (part.startsWith('__') && part.endsWith('__'))
+
+    return isBold
+      ? <strong key={`${keyPrefix}-${index}`}>{part.slice(2, -2)}</strong>
+      : part
+  })
+}
+
+function renderAnswer(text) {
+  const blocks = []
+  let paragraph = []
+  let listItems = []
+  let listType = ''
+
+  function flushParagraph() {
+    if (paragraph.length) {
+      blocks.push({ type: 'paragraph', text: paragraph.join(' ') })
+      paragraph = []
+    }
+  }
+
+  function flushList() {
+    if (listItems.length) {
+      blocks.push({ type: listType, items: listItems })
+      listItems = []
+      listType = ''
+    }
+  }
+
+  text.split('\n').forEach((line) => {
+    const content = line.trim()
+    const heading = content.match(/^#{1,3}\s+(.+)$/)
+    const unorderedItem = content.match(/^[-*]\s+(.+)$/)
+    const orderedItem = content.match(/^\d+[.)]\s+(.+)$/)
+
+    if (!content) {
+      flushParagraph()
+      flushList()
+    } else if (heading) {
+      flushParagraph()
+      flushList()
+      blocks.push({ type: 'heading', text: heading[1] })
+    } else if (unorderedItem || orderedItem) {
+      flushParagraph()
+      const nextListType = unorderedItem ? 'unordered' : 'ordered'
+      if (listType && listType !== nextListType) flushList()
+      listType = nextListType
+      listItems.push(unorderedItem ? unorderedItem[1] : orderedItem[1])
+    } else {
+      flushList()
+      paragraph.push(content)
+    }
+  })
+
+  flushParagraph()
+  flushList()
+
+  return blocks.map((block, index) => {
+    if (block.type === 'heading') {
+      return <h3 key={index}>{renderAnswerInline(block.text, `heading-${index}`)}</h3>
+    }
+    if (block.type === 'paragraph') {
+      return <p key={index}>{renderAnswerInline(block.text, `paragraph-${index}`)}</p>
+    }
+
+    const List = block.type === 'ordered' ? 'ol' : 'ul'
+    return (
+      <List key={index}>
+        {block.items.map((item, itemIndex) => (
+          <li key={itemIndex}>{renderAnswerInline(item, `list-${index}-${itemIndex}`)}</li>
+        ))}
+      </List>
+    )
+  })
 }
 
 function App() {
@@ -49,6 +125,10 @@ function App() {
   const [locationError, setLocationError] = useState('')
   const [lastQuestion, setLastQuestion] = useState('')
   const [answer, setAnswer] = useState('')
+  const [vehicleImage, setVehicleImage] = useState(null)
+  const [vehicleImageLoading, setVehicleImageLoading] = useState(false)
+  const [vehicleImageMessage, setVehicleImageMessage] = useState('')
+  const [imageVehicleLabel, setImageVehicleLabel] = useState('')
   const [resultLocation, setResultLocation] = useState('')
   const [resultCoordinates, setResultCoordinates] = useState(null)
   const [resultMode, setResultMode] = useState('')
@@ -62,6 +142,7 @@ function App() {
   const [showResult, setShowResult] = useState(false)
   const [resultNavigation, setResultNavigation] = useState(0)
   const resultRef = useRef(null)
+  const imageSearchController = useRef(null)
 
   const selectedMode = modes.find((mode) => mode.id === activeMode)
   const vehicleDescription = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')
@@ -152,10 +233,16 @@ function App() {
   }
 
   function selectMode(mode) {
+    imageSearchController.current?.abort()
+    imageSearchController.current = null
     setActiveMode(mode)
     setDetails('')
     setLastQuestion('')
     setAnswer('')
+    setVehicleImage(null)
+    setVehicleImageLoading(false)
+    setVehicleImageMessage('')
+    setImageVehicleLabel('')
     setResultLocation('')
     setResultCoordinates(null)
     setResultMode('')
@@ -186,6 +273,11 @@ function App() {
     setIsLoading(true)
     setError('')
     setAnswer('')
+    setVehicleImage(null)
+    setVehicleImageMessage('')
+    setVehicleImageLoading(false)
+    imageSearchController.current?.abort()
+    imageSearchController.current = null
     setResultLocation('')
     setResultCoordinates(null)
     setResultMode('')
@@ -198,6 +290,40 @@ function App() {
     setLastQuestion(activeMode === 'vehicle' ? vehicleDescription : details.trim())
     setShowResult(true)
     setResultNavigation((current) => current + 1)
+    if (activeMode === 'vehicle') {
+      const submittedMake = vehicle.make.trim()
+      const submittedModel = vehicle.model.trim()
+      const submittedYear = vehicle.year.trim()
+      setImageVehicleLabel([submittedYear, submittedMake, submittedModel].filter(Boolean).join(' '))
+
+      if (!submittedMake || !submittedModel) {
+        setVehicleImageMessage('Escribe la marca y el modelo para buscar una imagen del vehículo.')
+      } else {
+        const controller = new AbortController()
+        imageSearchController.current = controller
+        setVehicleImageLoading(true)
+        fetch('http://localhost:8000/vehicle-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ make: submittedMake, model: submittedModel, year: submittedYear || null }),
+          signal: controller.signal,
+        })
+          .then(async (imageResponse) => {
+            const data = await imageResponse.json()
+            if (!imageResponse.ok) throw new Error(data.detail || 'No se pudo buscar la imagen.')
+            setVehicleImage(data.image)
+            if (!data.image) setVehicleImageMessage('No encontramos una imagen para ese vehículo en Wikimedia Commons.')
+          })
+          .catch((imageError) => {
+            if (imageError.name !== 'AbortError') {
+              setVehicleImageMessage(imageError.message || 'No se pudo cargar la imagen del vehículo.')
+            }
+          })
+          .finally(() => {
+            if (!controller.signal.aborted) setVehicleImageLoading(false)
+          })
+      }
+    }
     try {
       const response = await fetch('http://localhost:8000/ask', {
         method: 'POST',
@@ -232,10 +358,21 @@ function App() {
 
       <main className="ai-main" id="inicio">
         <section className="ai-intro">
-          <p className="ai-eyebrow">TU COPILOTO DE TALLER <span>·</span> SIEMPRE A MANO</p>
-          <h1>Entiende tu auto.<br /><em>Resuelve lo que sigue.</em></h1>
-          <p className="ai-subtitle">Elige qué necesitas y lo vemos juntos, paso a paso.</p>
-          <div className="garage-photo" role="img" aria-label="Detalle de un mecánico revisando un automóvil"><span>EN EL TALLER</span></div>
+          <div className="intro-copy">
+            <p className="ai-eyebrow">TU COPILOTO DE TALLER <span>·</span> SIEMPRE A MANO</p>
+            <h1>Entiende tu auto.<br /><em>Resuelve lo que sigue.</em></h1>
+            <p className="ai-subtitle">Elige qué necesitas y lo vemos juntos, paso a paso.</p>
+          </div>
+          <div className="garage-gallery" aria-label="Imágenes del taller y el automóvil">
+            <figure className="garage-photo">
+              <img src="https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=900&q=85" alt="Mecánico revisando un automóvil en el taller" />
+              <figcaption><span>EN EL TALLER</span><strong>Consejos para cuidar tu auto</strong></figcaption>
+            </figure>
+            <figure className="garage-detail-photo">
+              <img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=85" alt="Automóvil deportivo visto de frente" />
+              <figcaption>CONOCE TU AUTO <span aria-hidden="true">↗</span></figcaption>
+            </figure>
+          </div>
         </section>
 
         <section className="mode-section" aria-label="Elige cómo quieres que te ayude">
@@ -243,6 +380,7 @@ function App() {
           <div className="mode-grid">
             {modes.map((mode) => (
               <button key={mode.id} className={`mode-card${activeMode === mode.id ? ' selected' : ''}`} onClick={() => selectMode(mode.id)} aria-pressed={activeMode === mode.id}>
+                <span className="mode-image"><img src={mode.image} alt={mode.imageAlt} /></span>
                 <span className="mode-number">{mode.number}</span>
                 <span className="mode-title">{mode.title}</span>
                 <span className="mode-description">{mode.description}</span>
@@ -330,7 +468,29 @@ function App() {
             <div className="result-content">
               {isLoading ? <div className="result-loading" role="status"><span className="loading-indicator" /><div><strong>Preparando tu respuesta</strong><p>La IA está revisando la información y organizando los pasos para ti.</p></div></div> : null}
               {error && <p className="result-error" role="alert">{error}</p>}
-              {answer && <><div className="result-answer-label"><span>RESPUESTA DE AUTOGUÍA</span></div><div className="result-answer">{answer}</div></>}
+              {answer && activeMode === 'vehicle' && (
+                <div className="vehicle-image-result" aria-live="polite">
+                  {vehicleImageLoading && <p className="vehicle-image-status" role="status">Buscando una imagen de {imageVehicleLabel}…</p>}
+                  {vehicleImage && (
+                    <figure>
+                      <img src={vehicleImage.url} alt={`Imagen ilustrativa de ${imageVehicleLabel}`} />
+                      <figcaption>
+                        <strong>{imageVehicleLabel}</strong>
+                        <span>Imagen ilustrativa; puede no coincidir con la versión o el año exactos.</span>
+                        <small>
+                          {vehicleImage.artist && <>Autor: {vehicleImage.artist} · </>}
+                          {vehicleImage.license && <>{vehicleImage.license} · </>}
+                          <a href={vehicleImage.sourceUrl} target="_blank" rel="noreferrer">Fuente: Wikimedia Commons ↗</a>
+                        </small>
+                      </figcaption>
+                    </figure>
+                  )}
+                  {!vehicleImageLoading && !vehicleImage && vehicleImageMessage && (
+                    <p className="vehicle-image-status" role="status">{vehicleImageMessage}</p>
+                  )}
+                </div>
+              )}
+              {answer && <><div className="result-answer-label"><span>RESPUESTA DE AUTOGUÍA</span></div><div className="result-answer">{renderAnswer(answer)}</div></>}
               {showNearbyMap && (
                 <div className="nearby-places">
                   <div className="nearby-places-label">
