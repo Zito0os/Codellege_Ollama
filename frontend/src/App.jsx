@@ -15,7 +15,7 @@ function buildNearbyMapUrl(mode, location, place, coordinates) {
     return `https://maps.google.com/maps?q=${place.latitude},${place.longitude}&z=17&output=embed`
   }
 
-  const placeType = mode === 'repair' ? 'talleres mecánicos' : 'refaccionarias'
+  const placeType = 'talleres AutoZone vulcanizadoras'
   if (coordinates) {
     const query = `${placeType} cerca de ${coordinates.latitude},${coordinates.longitude}`
     return `https://maps.google.com/maps?q=${encodeURIComponent(query)}&z=13&output=embed`
@@ -496,12 +496,12 @@ function App() {
                   <div className="nearby-places-label">
                     <span>LUGARES CERCANOS</span>
                     <small>
-                      {resultMode === 'repair' ? 'Talleres mecánicos' : 'Refaccionarias'} cerca de {resultLocation}
+                      Talleres, autopartes y vulcanizadoras cerca de {resultLocation} · hasta 5 de cada tipo
                     </small>
                   </div>
                   <div className="nearby-map">
                     <iframe
-                      title={selectedNearbyPlace ? `Mapa de ${selectedNearbyPlace.name}` : resultMode === 'repair' ? `Talleres mecánicos cerca de ${resultLocation}` : `Refaccionarias cerca de ${resultLocation}`}
+                      title={selectedNearbyPlace ? `Mapa de ${selectedNearbyPlace.name}` : `Lugares automotrices cerca de ${resultLocation}`}
                       src={buildNearbyMapUrl(resultMode, resultLocation, selectedNearbyPlace, resultCoordinates)}
                       loading="lazy"
                       referrerPolicy="no-referrer-when-downgrade"
@@ -521,14 +521,21 @@ function App() {
                     </div>
                   )}
                   {!isLoadingNearby && !nearbyPlacesError && nearbyPlaces.length === 0 && <p className="nearby-status">No encontramos establecimientos automotrices registrados a menos de 5 km.</p>}
-                  {!isLoadingNearby && !nearbyPlacesError && nearbyPlaces.length > 0 && nearbyPlaces.length < 5 && <p className="nearby-status">Encontramos {nearbyPlaces.length} establecimientos automotrices registrados a menos de 5 km.</p>}
+                  {!isLoadingNearby && !nearbyPlacesError && nearbyPlaces.length > 0 && (
+                    <p className="nearby-status">
+                      Encontramos {nearbyPlaces.length} lugares: talleres, tiendas de autopartes y vulcanizadoras (máx. 5 de cada una).
+                    </p>
+                  )}
                   <ul className="nearby-list">
-                    {nearbyPlaces.slice(0, 5).map((place, index) => (
+                    {nearbyPlaces.map((place, index) => (
                       <li key={place.id} className={selectedNearbyPlace?.id === place.id ? 'selected' : ''}>
                         <span className="nearby-order">{String(index + 1).padStart(2, '0')}</span>
                         <div className="nearby-place-info">
                           <strong>{place.name}</strong>
-                          <small>{place.address} · {place.distanceMeters < 1000 ? `${place.distanceMeters} m` : `${(place.distanceMeters / 1000).toFixed(1)} km`}</small>
+                          <small>
+                            {place.categoryLabel ? `${place.categoryLabel} · ` : ''}
+                            {place.address} · {place.distanceMeters < 1000 ? `${place.distanceMeters} m` : `${(place.distanceMeters / 1000).toFixed(1)} km`}
+                          </small>
                         </div>
                         <button
                           className="nearby-select"

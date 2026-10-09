@@ -14,6 +14,8 @@ from typing import Literal, Optional
 app = FastAPI()
 nearby_cache = {}
 NEARBY_RADIUS_METERS = 5_000
+NEARBY_PER_CATEGORY = 5
+NEARBY_CACHE_VERSION = 2
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -148,19 +150,27 @@ def find_nearby_places(request: NearbyPlacesRequest):
 
         latitude = float(locations[0]["lat"])
         longitude = float(locations[0]["lon"])
-    cache_key = (request.mode, round(latitude, 4), round(longitude, 4), NEARBY_RADIUS_METERS)
+    cache_key = (
+        NEARBY_CACHE_VERSION,
+        request.mode,
+        round(latitude, 4),
+        round(longitude, 4),
+        NEARBY_RADIUS_METERS,
+        NEARBY_PER_CATEGORY,
+    )
     cached_result = nearby_cache.get(cache_key)
     if cached_result and cached_result["expires_at"] > time.time():
         return cached_result["result"]
 
-    if request.mode == "repair":
-        tag_filter = '["shop"="car_repair"]'
-    else:
-        tag_filter = '["shop"="car_parts"]'
-
+    # Talleres + autopartes (AutoZone, etc.) + vulcanizadoras / llanteras
     overpass_query = (
-        f'[out:json][timeout:15];'
-        f'nwr(around:{NEARBY_RADIUS_METERS},{latitude},{longitude}){tag_filter};'
+        f"[out:json][timeout:20];"
+        f"("
+        f'nwr(around:{NEARBY_RADIUS_METERS},{latitude},{longitude})["shop"="car_repair"];'
+        f'nwr(around:{NEARBY_RADIUS_METERS},{latitude},{longitude})["craft"="car_repair"];'
+        f'nwr(around:{NEARBY_RADIUS_METERS},{latitude},{longitude})["shop"="car_parts"];'
+        f'nwr(around:{NEARBY_RADIUS_METERS},{latitude},{longitude})["shop"="tyres"];'
+        f");"
         "out center tags;"
     )
     data = None
@@ -173,7 +183,7 @@ def find_nearby_places(request: NearbyPlacesRequest):
             method="POST",
         )
         try:
-            with urlopen(overpass_request, timeout=15) as response:
+            with urlopen(overpass_request, timeout=20) as response:
                 data = json.loads(response.read().decode("utf-8"))
             break
         except HTTPError as error:
@@ -187,8 +197,16 @@ def find_nearby_places(request: NearbyPlacesRequest):
     if data is None:
         elements = []
         seen_places = set()
-        search_terms = ("taller", "mecánico", "llantera") if request.mode == "repair" else ("refaccionaria", "autopartes", "llantera")
-        accepted_values = {"car_repair", "tyres"} if request.mode == "repair" else {"car_parts", "car", "tyres"}
+        search_terms = (
+            "taller",
+            "mecánico",
+            "autozone",
+            "refaccionaria",
+            "autopartes",
+            "vulcanizadora",
+            "llantera",
+        )
+        accepted_values = {"car_repair", "car_parts", "car", "tyres"}
         for search_term in search_terms:
             photon_url = "https://photon.komoot.io/api/?" + urlencode({
                 "q": search_term,
@@ -213,8 +231,23 @@ def find_nearby_places(request: NearbyPlacesRequest):
                 osm_value = properties.get("osm_value")
                 name = properties["name"].casefold()
                 is_automotive_shop = osm_key == "shop" and osm_value in accepted_values
-                is_repair_craft = request.mode == "repair" and osm_key == "craft" and osm_value == "car_repair"
-                if not (is_automotive_shop or is_repair_craft):
+                is_repair_craft = osm_key == "craft" and osm_value == "car_repair"
+                looks_automotive = any(
+                    token in name
+                    for token in (
+                        "taller",
+                        "mecán",
+                        "mecan",
+                        "autozone",
+                        "refaccion",
+                        "autoparte",
+                        "vulcaniz",
+                        "llanta",
+                        "tyre",
+                        "tire",
+                    )
+                )
+                if not (is_automotive_shop or is_repair_craft or looks_automotive):
                     continue
                 identity = (properties.get("osm_type"), properties.get("osm_id"))
                 if identity == (None, None):
@@ -253,36 +286,98 @@ def find_nearby_places(request: NearbyPlacesRequest):
         haversine = math.sin(delta_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(delta_lon / 2) ** 2
         return earth_radius * 2 * math.atan2(math.sqrt(haversine), math.sqrt(1 - haversine))
 
-    places = [
-        {
-            "id": f"{element['type']}-{element['id']}",
-            "name": element["tags"].get("name") or element["tags"].get("brand") or "Negocio automotriz",
-            "address": ", ".join(filter(None, (
-                element["tags"].get("addr:full"),
-                " ".join(filter(None, (element["tags"].get("addr:street"), element["tags"].get("addr:housenumber")))),
-                element["tags"].get("addr:suburb"),
-                element["tags"].get("addr:city"),
-            ))) or (
-                f"Ubicación {element.get('lat', element.get('center', {}).get('lat')):.6f}, "
-                f"{element.get('lon', element.get('center', {}).get('lon')):.6f}"
-            ),
-            "latitude": element.get("lat", element.get("center", {}).get("lat")),
-            "longitude": element.get("lon", element.get("center", {}).get("lon")),
-            "distanceMeters": 0,
-        }
-        for element in data.get("elements", [])
-        if element.get("tags", {}).get("name") or element.get("tags", {}).get("brand")
-        if element.get("lat", element.get("center", {}).get("lat")) is not None
-        and element.get("lon", element.get("center", {}).get("lon")) is not None
-    ]
-    for place in places:
-        place["distanceMeters"] = round(distance_meters(place["latitude"], place["longitude"]))
-        map_query = f"{place['name']}, {place['address']} {place['latitude']},{place['longitude']}"
-        place["href"] = "https://www.google.com/maps/search/?api=1&" + urlencode({"query": map_query})
+    def classify_place(tags: dict) -> str:
+        shop = (tags.get("shop") or "").casefold()
+        craft = (tags.get("craft") or "").casefold()
+        label = " ".join(
+            filter(None, (tags.get("name"), tags.get("brand"), tags.get("operator")))
+        ).casefold()
 
-    places = [place for place in places if place["distanceMeters"] <= NEARBY_RADIUS_METERS]
-    places.sort(key=lambda place: place["distanceMeters"])
-    result = {"places": places[:5], "source": source}
+        if shop == "tyres" or any(token in label for token in ("vulcaniz", "llantera", "llanta", "tyre", "tire")):
+            return "vulcanizadora"
+        if shop == "car_parts" or any(
+            token in label
+            for token in (
+                "autozone",
+                "auto zone",
+                "refaccion",
+                "autoparte",
+                "auto parte",
+                "oreilly",
+                "o'reilly",
+                "napa auto",
+            )
+        ):
+            return "autopartes"
+        if shop == "car_repair" or craft == "car_repair" or any(
+            token in label for token in ("taller", "mecán", "mecan", "service auto", "autoservicio")
+        ):
+            return "taller"
+        if shop == "car":
+            return "autopartes"
+        return "taller"
+
+    category_labels = {
+        "taller": "Taller",
+        "autopartes": "Autopartes",
+        "vulcanizadora": "Vulcanizadora",
+    }
+
+    places = []
+    for element in data.get("elements", []):
+        tags = element.get("tags", {})
+        if not (tags.get("name") or tags.get("brand")):
+            continue
+        place_lat = element.get("lat", element.get("center", {}).get("lat"))
+        place_lon = element.get("lon", element.get("center", {}).get("lon"))
+        if place_lat is None or place_lon is None:
+            continue
+        category = classify_place(tags)
+        name = tags.get("name") or tags.get("brand") or "Negocio automotriz"
+        address = ", ".join(filter(None, (
+            tags.get("addr:full"),
+            " ".join(filter(None, (tags.get("addr:street"), tags.get("addr:housenumber")))),
+            tags.get("addr:suburb"),
+            tags.get("addr:city"),
+        ))) or f"Ubicación {place_lat:.6f}, {place_lon:.6f}"
+        distance = round(distance_meters(float(place_lat), float(place_lon)))
+        if distance > NEARBY_RADIUS_METERS:
+            continue
+        map_query = f"{name}, {address} {place_lat},{place_lon}"
+        places.append({
+            "id": f"{element['type']}-{element['id']}",
+            "name": name,
+            "address": address,
+            "latitude": float(place_lat),
+            "longitude": float(place_lon),
+            "distanceMeters": distance,
+            "category": category,
+            "categoryLabel": category_labels[category],
+            "href": "https://www.google.com/maps/search/?api=1&" + urlencode({"query": map_query}),
+        })
+
+    # 5 más cercanos de cada categoría (taller, autopartes, vulcanizadora)
+    selected = []
+    seen_ids = set()
+    for category in ("taller", "autopartes", "vulcanizadora"):
+        group = [place for place in places if place["category"] == category]
+        group.sort(key=lambda place: place["distanceMeters"])
+        for place in group[:NEARBY_PER_CATEGORY]:
+            if place["id"] in seen_ids:
+                continue
+            seen_ids.add(place["id"])
+            selected.append(place)
+
+    selected.sort(key=lambda place: (place["category"], place["distanceMeters"]))
+    result = {
+        "places": selected,
+        "source": source,
+        "counts": {
+            "taller": sum(1 for place in selected if place["category"] == "taller"),
+            "autopartes": sum(1 for place in selected if place["category"] == "autopartes"),
+            "vulcanizadora": sum(1 for place in selected if place["category"] == "vulcanizadora"),
+        },
+    }
     nearby_cache[cache_key] = {"expires_at": time.time() + 300, "result": result}
     return result
 
