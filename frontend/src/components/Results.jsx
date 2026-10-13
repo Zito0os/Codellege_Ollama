@@ -17,11 +17,38 @@ export default function RecipeCard({ recipe, saved, used, onOpen, onSave, onUse 
         </div>
       </button>
       <div className="recipe-card__bar">
-        <button type="button" className="btn btn--soft" onClick={() => onSave(recipe)}>
+        <button
+          type="button"
+          className={`btn recipe-action recipe-action--save ${saved ? 'recipe-action--saved' : ''}`}
+          onClick={() => onSave(recipe)}
+          aria-pressed={saved}
+        >
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="M5 3.5h10v13l-5-3.2-5 3.2v-13z"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinejoin="round"
+            />
+          </svg>
           {saved ? 'Guardada' : 'Guardar'}
         </button>
-        <button type="button" className="btn btn--soft btn--solid" onClick={() => onUse(recipe)} disabled={used}>
+        <button
+          type="button"
+          className={`btn recipe-action recipe-action--use ${used ? 'recipe-action--used' : ''}`}
+          onClick={() => onUse(recipe)}
+          disabled={used}
+        >
           {used ? 'Usada' : 'Usar'}
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="M3.5 10h12m-5-5 5 5-5 5"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </button>
       </div>
     </article>
