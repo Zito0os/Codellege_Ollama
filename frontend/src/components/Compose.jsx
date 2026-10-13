@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { CUISINE_OPTIONS, UNITS } from '../data/options'
+import { UNITS } from '../data/options'
 import { normalizeKey } from '../utils/normalize'
 
 const cuisineImages = Object.fromEntries(
@@ -16,6 +16,23 @@ const cuisineImages = Object.fromEntries(
 )
 
 const cuisineImageAliases = { comfort: 'confort', asados: 'asado' }
+const cravingCategories = [
+  {
+    name: 'Internacional',
+    image: 'mexicana',
+    options: ['Mexicana', 'Italiana', 'Oriental', 'Francesa', 'Mediterránea', 'India'],
+  },
+  {
+    name: 'Tipos',
+    image: 'saludable',
+    options: ['Saludable', 'Comfort', 'Picante', 'Desayuno', 'Rápida', 'Bowl', 'Veggie', 'Casera'],
+  },
+  {
+    name: 'Platillo',
+    image: 'mariscos',
+    options: ['Mariscos', 'Pasta', 'Sopa', 'Ensalada', 'Tacos', 'Asados'],
+  },
+]
 
 function makeId() {
   return `ing-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
@@ -116,6 +133,7 @@ export default function Compose({
   const [qty, setQty] = useState('1')
   const [unit, setUnit] = useState('piezas')
   const [types, setTypes] = useState([])
+  const [activeCravingCategory, setActiveCravingCategory] = useState(null)
   const [note, setNote] = useState('')
   const [ingError, setIngError] = useState('')
   const [editingId, setEditingId] = useState(null)
@@ -514,32 +532,66 @@ export default function Compose({
 
         <article className="panel panel--lite">
           <div className="panel__title-row">
-            <h2>Antojo</h2>
+            <h2>{activeCravingCategory ? activeCravingCategory.name : 'Antojo'}</h2>
             <span className="muted">{types.length}/4</span>
           </div>
 
-          <div className="craving-grid" role="group" aria-label="Tipos de comida">
-            {CUISINE_OPTIONS.map((label) => {
-              const on = types.includes(label)
-              const lockedOut = !on && types.length >= 4
-              const imageKey = cuisineImageAliases[normalizeKey(label)] || normalizeKey(label)
-              return (
-                <button
-                  key={label}
-                  type="button"
-                  className={`craving ${on ? 'craving--on' : ''}`}
-                  aria-pressed={on}
-                  disabled={lockedOut}
-                  onClick={() => toggleType(label)}
-                >
-                  {cuisineImages[imageKey] ? (
-                    <img className="craving__image" src={cuisineImages[imageKey]} alt="" />
-                  ) : null}
-                  <span className="craving__label">{label}</span>
-                </button>
-              )
-            })}
-          </div>
+          {activeCravingCategory ? (
+            <>
+              <button
+                type="button"
+                className="craving__back"
+                onClick={() => setActiveCravingCategory(null)}
+              >
+                <span aria-hidden="true">←</span> Categorías
+              </button>
+              <div className="craving-grid" role="group" aria-label={activeCravingCategory.name}>
+                {activeCravingCategory.options.map((label) => {
+                  const on = types.includes(label)
+                  const lockedOut = !on && types.length >= 4
+                  const imageKey = cuisineImageAliases[normalizeKey(label)] || normalizeKey(label)
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      className={`craving ${on ? 'craving--on' : ''}`}
+                      aria-pressed={on}
+                      disabled={lockedOut}
+                      onClick={() => toggleType(label)}
+                    >
+                      {cuisineImages[imageKey] ? (
+                        <img className="craving__image" src={cuisineImages[imageKey]} alt="" />
+                      ) : null}
+                      <span className="craving__label">{label}</span>
+                      {on ? <span className="craving__selected" aria-hidden="true">✓</span> : null}
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="craving-category-grid" role="group" aria-label="Categorías de antojo">
+              {cravingCategories.map((category) => {
+                const selectedCount = category.options.filter((option) => types.includes(option)).length
+                return (
+                  <button
+                    key={category.name}
+                    type="button"
+                    className="craving-category"
+                    onClick={() => setActiveCravingCategory(category)}
+                  >
+                    <img
+                      className="craving-category__image"
+                      src={cuisineImages[category.image]}
+                      alt=""
+                    />
+                    <span className="craving-category__name">{category.name}</span>
+                    <span className="craving-category__count">{selectedCount}/{category.options.length}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
           <label className="field field--note">
             <span>Nota libre</span>

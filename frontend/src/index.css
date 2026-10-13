@@ -1156,11 +1156,89 @@ img {
 
 .craving-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.35rem;
-  overflow: auto;
-  max-height: 28vh;
   padding-right: 0.15rem;
+}
+
+.craving-category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.craving-category {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  min-width: 0;
+  min-height: 104px;
+  aspect-ratio: 1 / 1;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.1rem;
+  padding: 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #4b3a2d;
+  color: #fff;
+  text-align: left;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.craving-category::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: '';
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.76), rgba(0, 0, 0, 0.05) 85%);
+}
+
+.craving-category__image {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.craving-category__name {
+  font-size: 0.9rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.craving-category__count {
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.craving-category:hover {
+  transform: translateY(-1px);
+  border-color: #fdba74;
+}
+
+.craving__back {
+  display: inline-flex;
+  align-self: flex-end;
+  align-items: center;
+  gap: 0.35rem;
+  width: max-content;
+  max-width: 100%;
+  flex: 0 0 auto;
+  min-height: 34px;
+  margin: 0.15rem 0 0.55rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .craving {
@@ -1211,8 +1289,26 @@ img {
 }
 
 .craving--on {
-  border-color: #fff;
-  box-shadow: inset 0 0 0 2px #f97316;
+  border-color: #6ee7b7;
+  box-shadow: inset 0 0 0 2px #047857, 0 0 0 2px rgba(4, 120, 87, 0.3);
+}
+
+.craving__selected {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  background: #047857;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: none;
 }
 
 .craving:disabled {
