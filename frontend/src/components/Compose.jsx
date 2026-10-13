@@ -309,7 +309,7 @@ export default function Compose({
       </header>
 
       <div className="compose__split">
-        <article className="panel panel--lite">
+        <article className="panel panel--lite panel--receipt">
           <h2>Ingredientes</h2>
 
           <div className="entry-tabs" role="tablist" aria-label="Cómo agregar ingredientes">
@@ -534,7 +534,6 @@ export default function Compose({
       </div>
 
       <div className="compose__cta">
-        <div className="compose__cta-blur" aria-hidden="true" />
         <div className="compose__cta-inner compose__cta-inner--compact">
           <button
             type="button"

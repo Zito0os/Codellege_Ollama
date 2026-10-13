@@ -2,7 +2,7 @@
 
 :root {
   /* Más blanco; naranja solo como acento (logo ya es #FAA058) */
-  --color-background: #fff9f4;
+  --color-background: #fd9046;
   --color-background-deep: #fff1e4;
   --color-foreground: #1c1917;
   --color-primary: #f97316;
@@ -574,6 +574,55 @@ img {
   overflow: visible;
 }
 
+.panel--receipt {
+  --receipt-edge:
+    0 15px, 2.5% 0, 5% 15px, 7.5% 0, 10% 15px, 12.5% 0, 15% 15px, 17.5% 0,
+    20% 15px, 22.5% 0, 25% 15px, 27.5% 0, 30% 15px, 32.5% 0, 35% 15px, 37.5% 0,
+    40% 15px, 42.5% 0, 45% 15px, 47.5% 0, 50% 15px, 52.5% 0, 55% 15px, 57.5% 0,
+    60% 15px, 62.5% 0, 65% 15px, 67.5% 0, 70% 15px, 72.5% 0, 75% 15px, 77.5% 0,
+    80% 15px, 82.5% 0, 85% 15px, 87.5% 0, 90% 15px, 92.5% 0, 95% 15px, 97.5% 0,
+    100% 15px, 100% calc(100% - 15px), 97.5% 100%, 95% calc(100% - 15px), 92.5% 100%,
+    90% calc(100% - 15px), 87.5% 100%, 85% calc(100% - 15px), 82.5% 100%,
+    80% calc(100% - 15px), 77.5% 100%, 75% calc(100% - 15px), 72.5% 100%,
+    70% calc(100% - 15px), 67.5% 100%, 65% calc(100% - 15px), 62.5% 100%,
+    60% calc(100% - 15px), 57.5% 100%, 55% calc(100% - 15px), 52.5% 100%,
+    50% calc(100% - 15px), 47.5% 100%, 45% calc(100% - 15px), 42.5% 100%,
+    40% calc(100% - 15px), 37.5% 100%, 35% calc(100% - 15px), 32.5% 100%,
+    30% calc(100% - 15px), 27.5% 100%, 25% calc(100% - 15px), 22.5% 100%,
+    20% calc(100% - 15px), 17.5% 100%, 15% calc(100% - 15px), 12.5% 100%,
+    10% calc(100% - 15px), 7.5% 100%, 5% calc(100% - 15px), 2.5% 100%,
+    0 calc(100% - 15px);
+  border: 0;
+  border-radius: 2px;
+  background: #ddcbb7;
+  padding-top: 1.35rem;
+  padding-bottom: 1.75rem;
+  box-shadow: none;
+  filter: none;
+  clip-path: polygon(var(--receipt-edge));
+}
+
+.panel--receipt::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  pointer-events: none;
+  background-color: #fffefa;
+  background-image:
+    linear-gradient(rgba(255, 254, 250, 0.72), rgba(255, 254, 250, 0.72)),
+    url('./assets/paper.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  clip-path: polygon(var(--receipt-edge));
+}
+
+.panel--receipt > * {
+  position: relative;
+  z-index: 1;
+}
+
 .panel__title-row {
   display: flex;
   align-items: baseline;
@@ -775,46 +824,88 @@ img {
 }
 
 .ing-list {
+  position: relative;
   list-style: none;
   margin: 0.75rem 0 0;
-  padding: 0;
+  padding: 0.85rem 0.9rem 0.65rem;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 0;
+  align-items: stretch;
+  background-color: #fffefa;
+  background-image:
+    repeating-linear-gradient(to bottom, transparent 0, transparent 35px, rgba(120, 91, 67, 0.12) 36px),
+    linear-gradient(rgba(255, 254, 250, 0.72), rgba(255, 254, 250, 0.72)),
+    url('./assets/paper.jpg');
+  background-size: auto, cover, cover;
+  background-position: center;
+  background-repeat: repeat, no-repeat, no-repeat;
+  border: 1px solid #ddcbb7;
+  box-shadow: 0 5px 12px rgba(92, 64, 40, 0.07);
+}
+
+.ing-list::before {
+  content: 'LISTA DE COMPRA';
+  display: block;
+  padding-bottom: 0.55rem;
+  margin-bottom: 0.2rem;
+  border-bottom: 1px dashed #cdbba7;
+  color: #806b58;
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-align: center;
+}
+
+.ing-list::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 0 12px, var(--color-background) 0 4px, transparent 4.5px)
+      left top / 9px 24px repeat-y,
+    radial-gradient(circle at 100% 12px, var(--color-background) 0 4px, transparent 4.5px)
+      right top / 9px 24px repeat-y;
 }
 
 .ing-chip {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.35rem;
-  width: fit-content;
+  gap: 0.45rem;
+  width: 100%;
   max-width: 100%;
-  background: #fffaf5;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 0.22rem 0.28rem 0.22rem 0.7rem;
-  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed #e2d6c8;
+  border-radius: 0;
+  padding: 0.43rem 0;
+  transition: background 0.2s ease;
 }
 
 .ing-chip--editing {
-  background: #fff;
-  box-shadow: 0 6px 18px rgba(194, 65, 12, 0.08);
-  border-color: #fdba74;
+  padding-right: 0.3rem;
+  padding-left: 0.3rem;
+  background: rgba(255, 241, 228, 0.8);
+  box-shadow: none;
 }
 
 .ing-chip__name {
+  min-width: 0;
+  flex: 1;
   font-size: 0.88rem;
-  max-width: 10ch;
+  max-width: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .ing-chip__meta {
+  margin-left: auto;
+  color: #806b58;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 0.8rem;
   font-weight: 700;
-  color: var(--color-muted-foreground);
   white-space: nowrap;
 }
 
@@ -872,6 +963,13 @@ img {
 
 .ing-chip__icon:hover {
   background: #ffe8d2;
+}
+
+.ing-list > .empty {
+  padding: 0.75rem 0 0.25rem;
+  color: #806b58;
+  font-size: 0.85rem;
+  text-align: center;
 }
 
 .craving-grid {
@@ -1005,22 +1103,6 @@ img {
   border: 0;
   box-shadow: none;
   background: transparent;
-}
-
-.compose__cta-blur {
-  pointer-events: none;
-  height: 5.5rem;
-  margin-bottom: -2.2rem;
-  background: linear-gradient(
-    to top,
-    rgba(255, 249, 244, 0.82) 0%,
-    rgba(255, 249, 244, 0.35) 55%,
-    rgba(255, 249, 244, 0) 100%
-  );
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 35%, transparent 100%);
-  mask-image: linear-gradient(to top, #000 0%, #000 35%, transparent 100%);
 }
 
 .compose__cta-inner {
