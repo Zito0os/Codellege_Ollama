@@ -2,6 +2,21 @@ import { useRef, useState } from 'react'
 import { CUISINE_OPTIONS, UNITS } from '../data/options'
 import { normalizeKey } from '../utils/normalize'
 
+const cuisineImages = Object.fromEntries(
+  Object.entries(
+    import.meta.glob('../assets/Carta_menu/*.{jpg,jpeg,png,webp}', {
+      eager: true,
+      import: 'default',
+      query: '?url',
+    }),
+  ).map(([path, image]) => [
+    normalizeKey(path.split('/').pop().replace(/\.[^.]+$/, '')),
+    image,
+  ]),
+)
+
+const cuisineImageAliases = { comfort: 'confort', asados: 'asado' }
+
 function makeId() {
   return `ing-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
 }
@@ -507,6 +522,7 @@ export default function Compose({
             {CUISINE_OPTIONS.map((label) => {
               const on = types.includes(label)
               const lockedOut = !on && types.length >= 4
+              const imageKey = cuisineImageAliases[normalizeKey(label)] || normalizeKey(label)
               return (
                 <button
                   key={label}
@@ -516,7 +532,10 @@ export default function Compose({
                   disabled={lockedOut}
                   onClick={() => toggleType(label)}
                 >
-                  {label}
+                  {cuisineImages[imageKey] ? (
+                    <img className="craving__image" src={cuisineImages[imageKey]} alt="" />
+                  ) : null}
+                  <span className="craving__label">{label}</span>
                 </button>
               )
             })}
