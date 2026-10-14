@@ -100,10 +100,7 @@ img {
   position: relative;
   overflow: clip;
   min-height: 100svh;
-  background:
-    radial-gradient(900px 480px at 100% 0%, rgba(250, 160, 88, 0.18), transparent 55%),
-    radial-gradient(700px 420px at 0% 90%, rgba(250, 160, 88, 0.1), transparent 50%),
-    var(--color-background);
+  background: var(--color-background);
 }
 
 .ambient__grain {
@@ -117,11 +114,14 @@ img {
 
 .ambient__shape {
   position: absolute;
-  border-radius: 42% 58% 50% 50%;
+  border-radius: 50%;
   pointer-events: none;
   will-change: transform;
-  border: 3px solid rgba(154, 52, 18, 0.12);
-  box-shadow: var(--shadow-clay);
+  
+  
+  z-index: 0;
+  opacity: 0.9;
+  background: #ffac756b;
 }
 
 .ambient__shape--a {
@@ -129,8 +129,6 @@ img {
   height: min(30vw, 280px);
   top: 8%;
   right: -6%;
-  background: linear-gradient(145deg, #ffe8d2, #faa058);
-  opacity: 0.22;
 }
 
 .ambient__shape--b {
@@ -138,13 +136,65 @@ img {
   height: min(20vw, 180px);
   bottom: 16%;
   left: -5%;
-  background: linear-gradient(160deg, #fdba74, #fb923c);
-  opacity: 0.12;
 }
 
 .ambient__shape--c {
-  display: none;
+  width: min(16vw, 150px);
+  height: min(16vw, 150px);
+  top: 10%;
+  left: 30%;
 }
+
+.ambient__shape--d {
+  width: min(18vw, 190px);
+  height: min(18vw, 190px);
+  top: 0%;
+  left: 0%;
+}
+
+.ambient__shape--e {
+  width: min(14vw, 120px);
+  height: min(14vw, 120px);
+  top: 0%;
+  left: 300%;
+}
+
+.ambient__shape--f {
+  width: min(14vw, 140px);
+  height: min(14vw, 140px);
+  top: 90%;
+  left: 50%;
+}
+
+.ambient__shape--g {
+  width: min(19vw, 290px);
+  height: min(19vw, 290px);
+  top: 80%;
+  left: 85%;
+}
+
+.ambient__shape--h {
+  width: min(13vw, 130px);
+  height: min(13vw, 130px);
+  top: 75%;
+  left: 50%;
+}
+
+.ambient__shape--i {
+  width: min(35vw, 250px);
+  height: min(35vw, 250px);
+  top: 15%;
+  left: 55%;
+}
+
+
+
+
+
+
+
+
+
 
 .ambient__content {
   position: relative;
@@ -661,6 +711,11 @@ img {
   border-radius: 2px;
   background: #ffe0bf;
   content: '';
+}
+
+.results__head .display--md {
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(124, 45, 18, 0.32);
 }
 
 .results--fit {

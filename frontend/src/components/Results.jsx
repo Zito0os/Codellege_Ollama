@@ -73,7 +73,7 @@ export function Results({
   return (
     <section className="results results--fit" ref={ref}>
       <header className="results__head">
-        <h1 className="display display--md">Ideas</h1>
+        <h1 className="display display--md">Mejores Opciones</h1>
         <div className="compose__actions">
           <button type="button" className="btn btn--soft" onClick={onBack}>
             Volver
