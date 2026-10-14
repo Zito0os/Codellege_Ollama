@@ -745,6 +745,63 @@ img {
   color: var(--color-muted-foreground);
 }
 
+.voice-input {
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  margin: 0 auto var(--space-2);
+  max-width: 36rem;
+  width: 100%;
+}
+
+.voice-input__button {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  padding: 0;
+  border: 1px solid #c75b20;
+  border-radius: 50%;
+  background: #d96e2b;
+  color: #fff;
+  cursor: pointer;
+  touch-action: none;
+  transition: background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.voice-input__button:hover:not(:disabled) {
+  background: #c95d23;
+}
+
+.voice-input__button:active,
+.voice-input__button--listening {
+  transform: scale(0.95);
+  background: #ad4c1e;
+  box-shadow: 0 0 0 5px rgba(217, 110, 43, 0.2);
+}
+
+.voice-input__button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.voice-input__button svg {
+  width: 1.4rem;
+  height: 1.4rem;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.voice-input__transcript {
+  min-height: 1.5em;
+  margin: 0;
+  color: #fff;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
 .compose__sub {
   margin: 0;
   font-size: 0.9rem;
