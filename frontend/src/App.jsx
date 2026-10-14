@@ -9,8 +9,9 @@ import { Results } from './components/Results'
 import StepRail from './components/StepRail'
 import StepStage, { stepDirection } from './components/StepStage'
 import Toast from './components/Toast'
+import { generateRecipesFromAI } from './api/recipes'
 import { useAmbientMotion } from './hooks/useMotion'
-import { generateRecipes, subtractIngredients } from './utils/recipes'
+import { subtractIngredients } from './utils/recipes'
 import {
   getHistory,
   getIngredients,
@@ -81,53 +82,59 @@ export default function App() {
     )
   }
 
-  function handleGenerate({ types, note }) {
+  async function handleGenerate({ types, note }) {
     setGenerating(true)
-    window.setTimeout(() => {
-      const batch = generateRecipes({
+    try {
+      const batch = await generateRecipesFromAI({
         ingredients,
         types,
         tools: tools || [],
+        note,
+        count: 4,
       })
       setRecipes(batch)
       setLastQuery({ types, note })
       setUsedId(null)
       setLockedIds(new Set())
       goToStep('results')
-      setGenerating(false)
-      setToast('Listo: 4 propuestas nuevas')
+      setToast(`Listo: ${batch.length} propuestas nuevas`)
       setHistory(
         pushHistory({
           id: `h-${Date.now()}`,
           at: Date.now(),
-          label: `Generó 4 recetas · ${types.join(', ')}`,
+          label: `Generó ${batch.length} recetas · ${types.join(', ')}`,
         }),
       )
-    }, 450)
+    } catch (error) {
+      setToast(error?.message || 'Error al generar con Ollama')
+    } finally {
+      setGenerating(false)
+    }
   }
 
-  function handleRegenerate() {
+  async function handleRegenerate() {
     if (!lastQuery) return
     const protectedRecipes = recipes.filter((r) => lockedIds.has(r.id))
     const need = 4 - protectedRecipes.length
     if (need <= 0) {
-      setToast('Todas están guardadas: quita alguna para regenerar')
+      setToast('Todas van guardadas: quita alguna para regenerar')
       return
     }
 
     setRegenerating(true)
-    window.setTimeout(() => {
-      const fresh = generateRecipes({
+    try {
+      const fresh = await generateRecipesFromAI({
         ingredients,
         types: lastQuery.types,
         tools: tools || [],
-      }).slice(0, need)
+        note: lastQuery.note || '',
+        count: need,
+      })
 
       setRecipes([...protectedRecipes, ...fresh].slice(0, 4))
-      setRegenerating(false)
       setToast(
         protectedRecipes.length
-          ? `Regeneradas ${need}. ${protectedRecipes.length} guardada(s) intactas`
+          ? `Regeneradas ${fresh.length}. ${protectedRecipes.length} guardada(s) intactas`
           : 'Nuevas 4 ideas listas',
       )
       setHistory(
@@ -137,7 +144,11 @@ export default function App() {
           label: 'Regeneró ideas (guardadas intactas)',
         }),
       )
-    }, 400)
+    } catch (error) {
+      setToast(error?.message || 'Error al regenerar con Ollama')
+    } finally {
+      setRegenerating(false)
+    }
   }
 
   function handleSave(recipe) {
