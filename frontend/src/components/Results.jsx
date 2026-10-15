@@ -23,6 +23,8 @@ export default function RecipeCard({ recipe, saved, used, onOpen, onSave, onUse 
           className={`btn recipe-action recipe-action--save ${saved ? 'recipe-action--saved' : ''}`}
           onClick={() => onSave(recipe)}
           aria-pressed={saved}
+          aria-label={saved ? 'Quitar de guardadas' : 'Guardar receta'}
+          title={saved ? 'Quitar de guardadas' : 'Guardar receta'}
         >
           <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
             <path
@@ -32,7 +34,6 @@ export default function RecipeCard({ recipe, saved, used, onOpen, onSave, onUse 
               strokeLinejoin="round"
             />
           </svg>
-          {saved ? 'Guardada' : 'Guardar'}
         </button>
         <button
           type="button"

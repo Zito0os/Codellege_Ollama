@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Ambient from './components/Ambient'
 import Brand from './components/Brand'
 import Compose from './components/Compose'
+import Guardados, { GuardadosDrawer, GuardadosTrigger } from './components/Guardados'
 import HistoryDrawer from './components/HistoryDrawer'
 import Onboarding from './components/Onboarding'
 import RecipeDetail from './components/RecipeDetail'
@@ -15,16 +16,21 @@ import { generateRecipes, subtractIngredients } from './utils/recipes'
 import {
   getHistory,
   getIngredients,
-  getSavedRecipes,
   getTools,
   pushHistory,
-  saveRecipe,
   setIngredients,
   setTools,
-  unsaveRecipe,
 } from './utils/storage'
 
 export default function App() {
+  return (
+    <Guardados>
+      {(guardados) => <AppContent guardados={guardados} />}
+    </Guardados>
+  )
+}
+
+function AppContent({ guardados }) {
   const rootRef = useRef(null)
   useAmbientMotion(rootRef)
 
@@ -35,7 +41,6 @@ export default function App() {
   const [stepDir, setStepDir] = useState(1)
   const [recipes, setRecipes] = useState([])
   const [lastQuery, setLastQuery] = useState(null)
-  const [saved, setSaved] = useState(() => getSavedRecipes())
   const [history, setHistory] = useState(() => getHistory())
   const [active, setActive] = useState(null)
   const [usedId, setUsedId] = useState(null)
@@ -45,6 +50,12 @@ export default function App() {
   const [regenerating, setRegenerating] = useState(false)
   const [toast, setToast] = useState('')
   const stepRef = useRef(step)
+  const { recipes: saved, open: savedOpen, setOpen: setSavedOpen, toggleSaved } = guardados
+  const savedIds = useMemo(() => {
+    const ids = new Set(lockedIds)
+    saved.forEach((recipe) => ids.add(recipe.id))
+    return ids
+  }, [lockedIds, saved])
 
   const goToStep = useCallback((next) => {
     setStepDir(stepDirection(stepRef.current, next))
@@ -52,12 +63,6 @@ export default function App() {
     setStepState(next)
   }, [])
   const finishSplash = useCallback(() => setShowSplash(false), [])
-
-  const savedIds = useMemo(() => {
-    const ids = new Set(lockedIds)
-    saved.forEach((r) => ids.add(r.id))
-    return ids
-  }, [saved, lockedIds])
 
   useEffect(() => {
     document.title = '10go hambre'
@@ -73,7 +78,6 @@ export default function App() {
   function handleOnboarding(chosenTools) {
     setTools(chosenTools)
     setToolsState(chosenTools)
-    goToStep('compose')
     setToast('Herramientas guardadas en este dispositivo')
     setHistory(
       pushHistory({
@@ -144,9 +148,8 @@ export default function App() {
   }
 
   function handleSave(recipe) {
-    const exists = saved.some((r) => r.id === recipe.id)
-    if (exists) {
-      setSaved(unsaveRecipe(recipe.id))
+    const added = toggleSaved(recipe)
+    if (!added) {
       setLockedIds((prev) => {
         const next = new Set(prev)
         next.delete(recipe.id)
@@ -155,7 +158,6 @@ export default function App() {
       setToast('Receta quitada de guardadas')
       return
     }
-    setSaved(saveRecipe(recipe))
     setLockedIds((prev) => new Set(prev).add(recipe.id))
     setToast('Guardada: no se borrará al regenerar')
     setHistory(
@@ -187,11 +189,22 @@ export default function App() {
   return (
     <div className="app" ref={rootRef}>
       <Ambient>
+        
         <div className="shell">
+          <div >    <GuardadosTrigger
+                  count={saved.length}
+                  open={savedOpen}
+                  onOpen={() => setSavedOpen(true)}
+                />
+                </div>
           <header className="topbar">
+                
             <Brand small />
             {step !== 'onboarding' && (
-              <p className="topbar__note">Sin cuentas · todo queda aquí</p>
+              <div className="topbar__tools">
+                <p className="topbar__note">Sin cuentas · todo queda aquí</p>
+                
+              </div>
             )}
           </header>
 
@@ -261,6 +274,19 @@ export default function App() {
         }}
       />
 
+      <GuardadosDrawer
+        open={savedOpen}
+        recipes={saved}
+        savedIds={savedIds}
+        usedId={usedId}
+        onClose={() => setSavedOpen(false)}
+        onOpenRecipe={(recipe) => {
+          setActive(recipe)
+        }}
+        onSave={handleSave}
+        onUse={handleUse}
+      />
+ 
       <Toast message={toast} onDone={clearToast} raised={step === 'results'} />
       {showSplash && <SplashScreen onFinish={finishSplash} />}
     </div>
