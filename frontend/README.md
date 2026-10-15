@@ -7,6 +7,10 @@ Currently, two official plugins are available:
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
 - [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
+## Probar el micrófono desde un celular
+
+Mantén presionado el botón del micrófono mientras hablas y suéltalo para detener la grabación. El servidor de desarrollo usa HTTPS y escucha en la red local. Ejecuta `npm run dev` y abre desde el celular la URL HTTPS de red local que muestra Vite; ambos dispositivos deben estar en la misma red. Para que el navegador confíe en el certificado de desarrollo, instala en el celular el certificado raíz `rootCA.pem` generado por mkcert y márcalo como confiable. Sin HTTPS confiable, el navegador no solicitará acceso al micrófono. En producción, publica el sitio mediante HTTPS.
+
 ## React Compiler
 
 The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).

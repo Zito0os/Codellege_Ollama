@@ -8,6 +8,7 @@ import RecipeDetail from './components/RecipeDetail'
 import { Results } from './components/Results'
 import StepRail from './components/StepRail'
 import StepStage, { stepDirection } from './components/StepStage'
+import SplashScreen from './components/SplashScreen'
 import Toast from './components/Toast'
 import { useAmbientMotion } from './hooks/useMotion'
 import { generateRecipes, subtractIngredients } from './utils/recipes'
@@ -27,6 +28,7 @@ export default function App() {
   const rootRef = useRef(null)
   useAmbientMotion(rootRef)
 
+  const [showSplash, setShowSplash] = useState(true)
   const [tools, setToolsState] = useState(() => getTools())
   const [ingredients, setIngredientsState] = useState(() => getIngredients())
   const [step, setStepState] = useState(() => (getTools()?.length ? 'compose' : 'onboarding'))
@@ -49,6 +51,7 @@ export default function App() {
     stepRef.current = next
     setStepState(next)
   }, [])
+  const finishSplash = useCallback(() => setShowSplash(false), [])
 
   const savedIds = useMemo(() => {
     const ids = new Set(lockedIds)
@@ -259,6 +262,7 @@ export default function App() {
       />
 
       <Toast message={toast} onDone={clearToast} raised={step === 'results'} />
+      {showSplash && <SplashScreen onFinish={finishSplash} />}
     </div>
   )
 }
