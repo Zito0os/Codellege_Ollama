@@ -121,9 +121,6 @@ export function Results({
           >
             Listo
           </button>
-          {!canFinish && (
-            <p className="results__hint-mini">Activa Listo cuando uses una receta</p>
-          )}
         </div>
       </div>
     </section>

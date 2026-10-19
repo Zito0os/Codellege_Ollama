@@ -265,6 +265,7 @@ img {
 }
 
 .topbar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -284,6 +285,10 @@ img {
 }
 
 .topbar__tools {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -298,8 +303,8 @@ img {
 }
 
 .topbar__saved svg {
-  width: 18px;
-  height: 18px;
+  width: 30px;
+  height: 30px;
 }
 
 .topbar__saved-count {
@@ -319,6 +324,15 @@ img {
   display: grid;
   gap: 0.45rem;
   justify-items: start;
+}
+
+.brand--interactive {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
 }
 
 .brand__logo {
@@ -719,7 +733,7 @@ img {
 }
 
 .btn--generate {
-  padding: 0.7rem 1.6rem;
+  padding: 0.8rem 1.7rem;
   min-height: 46px;
   font-size: 1.05rem;
   font-family: var(--display);
@@ -729,6 +743,7 @@ img {
 
 .compose__cta .btn--generate,
 .results__footer .btn--generate {
+  opacity: 1;
   background: #fff;
   border-color: #f3d2b3;
   color: #9a3412;
@@ -772,16 +787,7 @@ img {
   text-shadow: 0 2px 4px rgba(124, 45, 18, 0.32);
 }
 
-.compose__head .display--md::after {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 2.75rem;
-  height: 4px;
-  border-radius: 2px;
-  background: #ffe0bf;
-  content: '';
-}
+
 
 .results__head .display--md {
   color: #fff;
@@ -793,13 +799,13 @@ img {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  padding-top: 0.85rem;
 }
 
 .results__footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 8;
+  position: static;
   margin-top: auto;
+ 
 }
 
 .results__footer .compose__cta-inner {
@@ -1600,7 +1606,7 @@ img {
   bottom: 0;
   z-index: 8;
   margin-top: auto;
-  padding: 0;
+  padding-top: 0;
   border: 0;
   box-shadow: none;
   background: transparent;
@@ -1611,12 +1617,12 @@ img {
   z-index: 1;
   display: flex;
   justify-content: center;
-  padding: 0.35rem 0 0.9rem;
+  padding: 0.35rem 0 0.5rem;
   background: transparent;
 }
 
 .compose__cta-inner--compact {
-  padding-top: 0;
+  padding: 1.5rem 0;
 }
 
 .results__grid {

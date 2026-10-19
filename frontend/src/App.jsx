@@ -64,6 +64,14 @@ function AppContent({ guardados }) {
   }, [])
   const finishSplash = useCallback(() => setShowSplash(false), [])
 
+  function handleGoHome() {
+    setActive(null)
+    setHistoryOpen(false)
+    setSavedOpen(false)
+    goToStep(tools?.length ? 'compose' : 'onboarding')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   useEffect(() => {
     document.title = '10go hambre'
   }, [])
@@ -191,21 +199,18 @@ function AppContent({ guardados }) {
       <Ambient>
         
         <div className="shell">
-          <div >    <GuardadosTrigger
-                  count={saved.length}
-                  open={savedOpen}
-                  onOpen={() => setSavedOpen(true)}
-                />
-                </div>
           <header className="topbar">
-                
-            <Brand small />
-            {step !== 'onboarding' && (
-              <div className="topbar__tools">
-                <p className="topbar__note">Sin cuentas · todo queda aquí</p>
-                
-              </div>
-            )}
+            <Brand small onClick={handleGoHome} />
+            <div className="topbar__tools">
+              
+              <GuardadosTrigger
+                count={saved.length}
+                open={savedOpen}
+                onOpen={() => setSavedOpen(true)}
+              />
+              
+            </div>
+           
           </header>
 
           <StepRail current={step} />
