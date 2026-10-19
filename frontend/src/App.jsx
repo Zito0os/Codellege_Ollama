@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
 function App() {
@@ -129,8 +129,10 @@ function App() {
       setError(
         requestError.name === 'AbortError'
           ? 'Análisis cancelado.'
+          : requestError instanceof TypeError
+            ? `No se pudo conectar con la API en ${API_URL}. Comprueba que FastAPI esté activo y accesible.`
           : requestError.message ||
-              'No se pudo conectar con la API. Comprueba que FastAPI y Ollama estén activos.',
+              'No se pudo completar el análisis. Comprueba la conexión con FastAPI y Ollama.',
       )
     } finally {
       abortControllerRef.current = null

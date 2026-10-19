@@ -1,5 +1,9 @@
 import json
+import os
 import re
+import shutil
+import subprocess
+import time
 import unicodedata
 from io import BytesIO
 
@@ -11,16 +15,31 @@ from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 import ollama
 
+from image_optimizer import PreparedImage, prepare_image
+
 app = FastAPI()
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
-VISION_MODEL = "qwen2.5vl:3b"
-VISION_MODEL_ADVANCED = "qwen3-vl:4b"
+MAX_IMAGE_DIMENSION = 1280
+VISION_MODEL = "llama3.2-vision:11b"
 VISION_PROMPT = (
-    "Escribe en español solo nombres de alimentos concretos que veas claramente en {parte}, "
-    "separados por comas. Sé muy conservador: omite lo tapado o dudoso y no adivines. "
-    "No repitas."
+    "Identifica todos los alimentos e ingredientes que se distingan claramente en la imagen. "
+    "Incluye frutas, verduras, carnes y otros alimentos; omite recipientes y objetos. "
+    "Devuelve únicamente los nombres breves en español solicitados por la estructura, "
+    "sin explicaciones ni conjeturas."
 )
 MAX_ITEMS_PER_ANALYSIS = 20
+VISION_FORMAT = {
+    "type": "object",
+    "properties": {
+        "alimentos": {
+            "type": "array",
+            "items": {"type": "string", "maxLength": 32},
+            "maxItems": MAX_ITEMS_PER_ANALYSIS,
+        }
+    },
+    "required": ["alimentos"],
+    "additionalProperties": False,
+}
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,51 +67,13 @@ def preparar_imagen(contenido: bytes) -> bytes:
         else:
             imagen = imagen.convert("RGB")
 
+    imagen.thumbnail(
+        (MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION),
+        Image.Resampling.LANCZOS,
+    )
     salida = BytesIO()
-    imagen.save(salida, format="JPEG", quality=90)
+    imagen.save(salida, format="JPEG", quality=88)
     return salida.getvalue()
-
-
-def crear_recortes_verificacion(contenido: bytes) -> list[bytes]:
-    """Divide imágenes alargadas en tres zonas para verificar alimentos pequeños."""
-    with Image.open(BytesIO(contenido)) as original:
-        imagen = original.convert("RGB")
-
-    ancho, alto = imagen.size
-    min_dim = min(ancho, alto)
-    max_dim = max(ancho, alto)
-    
-    if min_dim == 0 or max_dim / min_dim < 1.25:
-        return []
-
-    solape = max(2, round(alto * 0.025))
-    limites = [round(alto * indice / 3) for indice in range(4)]
-    recortes = []
-    for indice in range(3):
-        arriba = max(0, limites[indice] - (solape if indice else 0))
-        abajo = min(alto, limites[indice + 1] + (solape if indice < 2 else 0))
-        recorte = imagen.crop((0, arriba, ancho, abajo))
-        if min(recorte.size) < 400:
-            recorte = recorte.resize(
-                (recorte.width * 3, recorte.height * 3),
-                Image.Resampling.LANCZOS,
-            )
-        salida = BytesIO()
-        recorte.save(salida, format="JPEG", quality=94)
-        recortes.append(salida.getvalue())
-
-    if ancho > alto * 1.25:
-        recorte = imagen.crop((round(ancho * 0.28), 0, round(ancho * 0.63), alto))
-        if min(recorte.size) < 400:
-            recorte = recorte.resize(
-                (recorte.width * 3, recorte.height * 3),
-                Image.Resampling.LANCZOS,
-            )
-        salida = BytesIO()
-        recorte.save(salida, format="JPEG", quality=94)
-        recortes.append(salida.getvalue())
-
-    return recortes
 
 
 def normalizar_alimento(alimento: str) -> str:
@@ -348,22 +329,6 @@ def extraer_alimentos(texto: str) -> list[str]:
     return alimentos
 
 
-def consolidar_alimentos(
-    resultado_completo: list[str],
-    resultados_recortes: list[list[str]],
-    minimo_recortes: int = 1,
-) -> list[str]:
-    confirmaciones = {}
-    for resultado in resultados_recortes:
-        for alimento in set(resultado):
-            confirmaciones[alimento] = confirmaciones.get(alimento, 0) + 1
-    return [
-        alimento
-        for alimento in resultado_completo
-        if confirmaciones.get(alimento, 0) >= minimo_recortes
-    ]
-
-
 def formatear_resultado(alimentos: list[str]) -> str:
     if not alimentos:
         return (
@@ -393,74 +358,209 @@ def formatear_resultado(alimentos: list[str]) -> str:
     )
 
 
-async def consultar_recorte(contenido: bytes, parte: str, modelo: str | None = None) -> list[str]:
-    modelo_actual = modelo or VISION_MODEL
-    imagen_completa = parte == "la imagen completa"
-    if modelo_actual == VISION_MODEL_ADVANCED:
-        opciones = {
-            "num_ctx": 16384 if imagen_completa else 8192,
-            "num_predict": 6144 if imagen_completa else 2048,
-            "temperature": 0,
-            "repeat_penalty": 1.15,
-        }
-    else:
-        opciones = {
-            "num_ctx": 4096,
-            "num_predict": 256,
-            "temperature": 0,
-            "repeat_penalty": 1.3,
-        }
+async def consultar_imagen(
+    contenido: bytes,
+    contexto_global: list[str] | None = None,
+) -> list[str]:
+    opciones = {
+        "num_ctx": 4096,
+        "num_predict": 128,
+        "temperature": 0,
+        "repeat_penalty": 1.1,
+    }
+    prompt = VISION_PROMPT
+    if contexto_global:
+        ingredientes_globales = ", ".join(contexto_global)
+        prompt += (
+            "\nLa imagen adjunta es un recorte de detalle. En la imagen completa ya "
+            f"se reconocieron: {ingredientes_globales}. Confirma alimentos claramente "
+            "visibles en este recorte, incluidos los pequeños; no repitas un elemento "
+            "que sea el mismo objeto ya reconocido y no descartes alimentos diferentes "
+            "por pertenecer a la misma clase."
+        )
 
     respuesta = await run_in_threadpool(
         ollama.chat,
-        model=modelo_actual,
+        model=VISION_MODEL,
+        keep_alive="1m",
+        format=VISION_FORMAT,
         options=opciones,
         messages=[{
             "role": "user",
-            "content": VISION_PROMPT.format(parte=parte),
+            "content": prompt,
             "images": [contenido],
         }],
     )
     texto = (respuesta.message.content or "").strip()
     print(
-        f"[Vision {parte}] modelo={modelo_actual} done={respuesta.done} reason={respuesta.done_reason} "
+        f"[Vision {'recorte' if contexto_global is not None else 'imagen completa'}] "
+        f"modelo={VISION_MODEL} done={respuesta.done} reason={respuesta.done_reason} "
         f"content_chars={len(texto)} preview={texto[:180]!r}"
     )
     if respuesta.done_reason == "length":
-        raise RuntimeError(
-            f"{modelo_actual} agotó el presupuesto de generación al analizar {parte}."
-        )
+        raise RuntimeError(f"{VISION_MODEL} agotó el límite de tokens de salida.")
     if not texto:
-        raise RuntimeError(f"{modelo_actual} no devolvió una respuesta final para {parte}.")
-    return extraer_alimentos(texto)
+        raise RuntimeError(f"{VISION_MODEL} no devolvió una respuesta final.")
+    try:
+        datos = json.loads(texto)
+    except json.JSONDecodeError:
+        return extraer_alimentos(texto)
+    if (
+        not isinstance(datos, dict)
+        or not isinstance(datos.get("alimentos"), list)
+        or not all(isinstance(alimento, str) for alimento in datos["alimentos"])
+    ):
+        raise RuntimeError(f"{VISION_MODEL} devolvió una respuesta estructurada inválida.")
+    return extraer_alimentos(", ".join(datos["alimentos"]))
 
 
-async def consultar_imagen(contenido: bytes, usar_modelo_avanzado: bool = False) -> list[str]:
-    """Analiza imagen: modelo base (3B) por defecto, 4B opcional si usar_modelo_avanzado=True."""
-    modelo_a_usar = VISION_MODEL_ADVANCED if usar_modelo_avanzado else VISION_MODEL
-    alimentos_completos = await consultar_recorte(contenido, "la imagen completa", modelo=modelo_a_usar)
-    recortes = await run_in_threadpool(crear_recortes_verificacion, contenido)
-    if not recortes:
-        return alimentos_completos
+def _medir_recursos() -> dict[str, float | None]:
+    memoria_ram_mb = None
+    memoria_vram_mb = None
 
-    resultados_recortes = []
-    for indice, recorte in enumerate(recortes, start=1):
-        parte = "la zona central" if indice == 4 else f"la zona {indice}"
-        resultados_recortes.append(
-            await consultar_recorte(recorte, f"{parte} de la imagen", modelo=modelo_a_usar)
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+
+        class ProcessMemoryCounters(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("PageFaultCount", wintypes.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        counters = ProcessMemoryCounters()
+        counters.cb = ctypes.sizeof(counters)
+        try:
+            kernel32 = ctypes.WinDLL("Kernel32.dll")
+            kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+            process = kernel32.GetCurrentProcess()
+            get_memory_info = ctypes.WinDLL("Psapi.dll").GetProcessMemoryInfo
+            get_memory_info.argtypes = [
+                wintypes.HANDLE,
+                ctypes.POINTER(ProcessMemoryCounters),
+                wintypes.DWORD,
+            ]
+            get_memory_info.restype = wintypes.BOOL
+            if get_memory_info(process, ctypes.byref(counters), counters.cb):
+                memoria_ram_mb = counters.WorkingSetSize / (1024 * 1024)
+        except (AttributeError, OSError) as error:
+            print(f"[Vision métricas] No se pudo medir RAM del proceso: {error}")
+
+    nvidia_smi = shutil.which("nvidia-smi")
+    if nvidia_smi:
+        try:
+            resultado = subprocess.run(
+                [
+                    nvidia_smi,
+                    "--query-gpu=memory.used",
+                    "--format=csv,noheader,nounits",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            memoria_vram_mb = float(resultado.stdout.splitlines()[0].strip())
+        except (
+            FileNotFoundError,
+            IndexError,
+            ValueError,
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
+        ):
+            print("[Vision métricas] No se pudo medir el uso global de VRAM.")
+
+    return {"ram_mb": memoria_ram_mb, "vram_mb": memoria_vram_mb}
+
+
+async def preparar_imagen_optimizada(
+    contenido: bytes,
+) -> tuple[PreparedImage, float, float, dict[str, float | None]]:
+    inicio_total = time.perf_counter()
+    recursos_antes = await run_in_threadpool(_medir_recursos)
+    inicio_preprocesamiento = time.perf_counter()
+    preparada: PreparedImage = await run_in_threadpool(prepare_image, contenido)
+    tiempo_preprocesamiento = time.perf_counter() - inicio_preprocesamiento
+    return preparada, inicio_total, tiempo_preprocesamiento, recursos_antes
+
+
+async def analizar_preparada(
+    preparada: PreparedImage,
+    inicio_total: float,
+    tiempo_preprocesamiento: float,
+    recursos_antes: dict[str, float | None],
+) -> list[str]:
+    inicio_inferencia = time.perf_counter()
+    llamadas = 0
+    alimentos: list[str] = []
+    try:
+        llamadas += 1
+        globales = await consultar_imagen(preparada.full_image)
+        alimentos.extend(globales)
+
+        if preparada.uses_regions:
+            for region in preparada.regions:
+                print(
+                    "[Vision región] "
+                    f"coordenadas={region.coordinates} "
+                    f"resolucion={region.width}x{region.height}"
+                )
+                llamadas += 1
+                alimentos.extend(
+                    await consultar_imagen(region.image, contexto_global=globales)
+                )
+        return extraer_alimentos(", ".join(alimentos))
+    finally:
+        tiempo_inferencia = time.perf_counter() - inicio_inferencia
+        recursos_despues = await run_in_threadpool(_medir_recursos)
+        resoluciones = [
+            f"global={preparada.full_width}x{preparada.full_height}"
+        ]
+        resoluciones.extend(
+            f"crop@{region.coordinates}={region.width}x{region.height}"
+            for region in preparada.regions
         )
-    with Image.open(BytesIO(contenido)) as imagen:
-        minimo_recortes = 2 if min(imagen.size) < 320 else 1
-    confirmados = consolidar_alimentos(
-        alimentos_completos,
-        resultados_recortes,
-        minimo_recortes=minimo_recortes,
+        print(
+            "[Vision métricas] "
+            f"preprocesamiento={tiempo_preprocesamiento:.3f}s "
+            f"inferencia={tiempo_inferencia:.3f}s "
+            f"total={time.perf_counter() - inicio_total:.3f}s "
+            f"llamadas_ollama={llamadas} recortes={len(preparada.regions)} "
+            f"original={preparada.original_width}x{preparada.original_height} "
+            f"inspeccion={preparada.inspection_width}x{preparada.inspection_height} "
+            f"calidad={preparada.quality_score:.3f} ruido={preparada.noise_level:.2f} "
+            f"score_complementario={preparada.complement_score:.3f} "
+            f"imagenes_enviadas={resoluciones} "
+            f"ram_mb={recursos_antes['ram_mb']}->{recursos_despues['ram_mb']} "
+            f"vram_gpu_mb={recursos_antes['vram_mb']}->{recursos_despues['vram_mb']}"
+        )
+
+
+async def analizar_imagen_optimizada(contenido: bytes) -> list[str]:
+    preparada, inicio_total, tiempo_preprocesamiento, recursos_antes = (
+        await preparar_imagen_optimizada(contenido)
     )
-    print(
-        f"[Vision consenso] modelo={modelo_a_usar} imagen={len(alimentos_completos)} "
-        f"recortes={sum(map(len, resultados_recortes))} confirmados={len(confirmados)}"
+    return await analizar_preparada(
+        preparada, inicio_total, tiempo_preprocesamiento, recursos_antes
     )
-    return confirmados
+
+
+def detalle_error_ollama(error: Exception) -> str:
+    mensaje = str(error)
+    if "requires more system memory" in mensaje.casefold():
+        return (
+            f"Ollama no tiene memoria libre suficiente para cargar {VISION_MODEL}. "
+            f"{mensaje} Cierra aplicaciones para liberar memoria y vuelve a intentarlo."
+        )
+    return f"No se pudo analizar la imagen con {VISION_MODEL}: {mensaje}"
 
 
 @app.get("/")
@@ -472,7 +572,7 @@ def home():
 def ask_llama(request: PromptRequest):
     try:
         response = ollama.chat(
-            model="llama3.2:3b",
+            model=VISION_MODEL,
             messages=[
                 {"role": "system", "content": "Eres un asistente útil. Responde siempre en español."},
                 {"role": "user", "content": request.prompt}
@@ -485,8 +585,8 @@ def ask_llama(request: PromptRequest):
 
 
 @app.post("/analizar")
-async def analizar(imagen: UploadFile = File(...), usar_modelo_avanzado: bool = False):
-    """Endpoint para analizar imagen. Parámetro usar_modelo_avanzado=true activa modelo 4B."""
+async def analizar(imagen: UploadFile = File(...)):
+    """Endpoint para analizar una imagen con el único modelo de visión configurado."""
     if not imagen.content_type or not imagen.content_type.startswith("image/"):
         raise HTTPException(status_code=415, detail="Selecciona un archivo de imagen válido.")
 
@@ -497,28 +597,31 @@ async def analizar(imagen: UploadFile = File(...), usar_modelo_avanzado: bool = 
         raise HTTPException(status_code=400, detail="El archivo de imagen está vacío.")
 
     try:
-        imagen_completa = await run_in_threadpool(preparar_imagen, contenido)
+        preparada, inicio_total, tiempo_preprocesamiento, recursos_antes = (
+            await preparar_imagen_optimizada(contenido)
+        )
     except (OSError, ValueError, Image.DecompressionBombError) as error:
         raise HTTPException(status_code=400, detail="No se pudo leer la imagen. Prueba con un JPG o PNG válido.") from error
 
     try:
-        modelo_actual = VISION_MODEL_ADVANCED if usar_modelo_avanzado else VISION_MODEL
-        alimentos = await consultar_imagen(imagen_completa, usar_modelo_avanzado=usar_modelo_avanzado)
+        alimentos = await analizar_preparada(
+            preparada, inicio_total, tiempo_preprocesamiento, recursos_antes
+        )
     except Exception as error:
         print(f"Error de Ollama al analizar la imagen: {error}")
         if isinstance(error, HTTPException):
             raise
         raise HTTPException(
             status_code=502,
-            detail=f"No se pudo analizar la imagen con {modelo_actual}. Revisa que Ollama esté activo y el modelo instalado.",
+            detail=detalle_error_ollama(error),
         ) from error
 
     return {"resultado": formatear_resultado(alimentos)}
 
 
 @app.post("/analizar/stream")
-async def analizar_stream(imagen: UploadFile = File(...), usar_modelo_avanzado: bool = False):
-    """Endpoint streaming para analizar imagen. Parámetro usar_modelo_avanzado=true activa modelo 4B."""
+async def analizar_stream(imagen: UploadFile = File(...)):
+    """Endpoint streaming con el único modelo de visión configurado."""
     if not imagen.content_type or not imagen.content_type.startswith("image/"):
         raise HTTPException(status_code=415, detail="Selecciona un archivo de imagen válido.")
 
@@ -529,18 +632,21 @@ async def analizar_stream(imagen: UploadFile = File(...), usar_modelo_avanzado: 
         raise HTTPException(status_code=400, detail="El archivo de imagen está vacío.")
 
     try:
-        imagen_completa = await run_in_threadpool(preparar_imagen, contenido)
+        preparada, inicio_total, tiempo_preprocesamiento, recursos_antes = (
+            await preparar_imagen_optimizada(contenido)
+        )
     except (OSError, ValueError, Image.DecompressionBombError) as error:
         raise HTTPException(status_code=400, detail="No se pudo leer la imagen. Prueba con un JPG o PNG válido.") from error
 
     async def generar_fragmentos():
         try:
-            modelo_actual = VISION_MODEL_ADVANCED if usar_modelo_avanzado else VISION_MODEL
             yield json.dumps(
-                {"type": "status", "message": f"Analizando con {modelo_actual}…"},
+                {"type": "status", "message": f"Analizando con {VISION_MODEL}…"},
                 ensure_ascii=False,
             ) + "\n"
-            alimentos = await consultar_imagen(imagen_completa, usar_modelo_avanzado=usar_modelo_avanzado)
+            alimentos = await analizar_preparada(
+                preparada, inicio_total, tiempo_preprocesamiento, recursos_antes
+            )
             yield json.dumps(
                 {"type": "status", "message": "Preparando el resultado…"},
                 ensure_ascii=False,
@@ -550,11 +656,10 @@ async def analizar_stream(imagen: UploadFile = File(...), usar_modelo_avanzado: 
             yield json.dumps({"type": "done"}) + "\n"
         except Exception as error:
             print(f"Error de Ollama al analizar la imagen: {error}")
-            modelo_actual = VISION_MODEL_ADVANCED if usar_modelo_avanzado else VISION_MODEL
             yield json.dumps(
                 {
                     "type": "error",
-                    "detail": f"No se pudo analizar la imagen con {modelo_actual}. Revisa la salida de FastAPI y Ollama.",
+                    "detail": detalle_error_ollama(error),
                 },
                 ensure_ascii=False,
             ) + "\n"
