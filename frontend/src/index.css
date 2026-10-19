@@ -2133,4 +2133,18 @@ img {
     animation: none !important;
     transition: none !important;
   }
+
+  .recipe-loading .recipe-loading__pan {
+    animation: recipe-pan-reduced-motion 2.4s ease-in-out infinite !important;
+  }
+
+  @keyframes recipe-pan-reduced-motion {
+    0%,
+    100% {
+      transform: rotate(-2deg) translateY(0);
+    }
+    50% {
+      transform: rotate(2deg) translateY(-3px);
+    }
+  }
 }
