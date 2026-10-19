@@ -5,6 +5,7 @@ import Compose from './components/Compose'
 import HistoryDrawer from './components/HistoryDrawer'
 import Onboarding from './components/Onboarding'
 import RecipeDetail from './components/RecipeDetail'
+import AnimatedLoading from './components/AnimatedLoading'
 import { Results } from './components/Results'
 import StepRail from './components/StepRail'
 import StepStage, { stepDirection } from './components/StepStage'
@@ -270,6 +271,9 @@ export default function App() {
       />
 
       <Toast message={toast} onDone={clearToast} raised={step === 'results'} />
+      {(generating || regenerating) && (
+        <AnimatedLoading mode={regenerating ? 'regenerate' : 'generate'} />
+      )}
     </div>
   )
 }

@@ -1,19 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import gsap from 'gsap'
 
 export default function Toast({ message, onDone, raised = false }) {
-  const [text, setText] = useState('')
   const elRef = useRef(null)
-  const onDoneRef = useRef(onDone)
   const tweenRef = useRef(null)
-  onDoneRef.current = onDone
-
-  useEffect(() => {
-    if (message) setText(message)
-  }, [message])
 
   useLayoutEffect(() => {
-    if (!text || !elRef.current) return undefined
+    if (!message || !elRef.current) return undefined
 
     const el = elRef.current
     tweenRef.current?.kill()
@@ -36,10 +29,7 @@ export default function Toast({ message, onDone, raised = false }) {
         filter: 'blur(5px)',
         duration: 0.38,
         ease: 'power2.in',
-        onComplete: () => {
-          setText('')
-          onDoneRef.current()
-        },
+        onComplete: onDone,
       })
     }, 2500)
 
@@ -48,9 +38,9 @@ export default function Toast({ message, onDone, raised = false }) {
       window.clearTimeout(hideTimer)
       tweenRef.current?.kill()
     }
-  }, [text])
+  }, [message, onDone])
 
-  if (!text) return null
+  if (!message) return null
 
   return (
     <div
@@ -59,7 +49,7 @@ export default function Toast({ message, onDone, raised = false }) {
       role="status"
       aria-live="polite"
     >
-      {text}
+      {message}
     </div>
   )
 }
