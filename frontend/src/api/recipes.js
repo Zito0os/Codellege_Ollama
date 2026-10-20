@@ -1,4 +1,4 @@
-const API_BASE = 'http://127.0.0.1:8000'
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 /**
  * Ask the local FastAPI + Ollama stack for recipe proposals.
@@ -17,10 +17,13 @@ export async function generateRecipesFromAI(payload) {
     }),
   })
 
-  let data = null
+  let data
   try {
     data = await response.json()
-  } catch {
+  } catch (error) {
+    if (response.ok) {
+      throw new Error('La API devolvió una respuesta no válida.', { cause: error })
+    }
     data = null
   }
 

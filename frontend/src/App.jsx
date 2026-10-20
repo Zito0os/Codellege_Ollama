@@ -5,14 +5,16 @@ import Compose from './components/Compose'
 import Guardados, { GuardadosDrawer, GuardadosTrigger } from './components/Guardados'
 import HistoryDrawer from './components/HistoryDrawer'
 import Onboarding from './components/Onboarding'
+import AnimatedLoading from './components/AnimatedLoading'
 import RecipeDetail from './components/RecipeDetail'
 import { Results } from './components/Results'
 import StepRail from './components/StepRail'
 import StepStage, { stepDirection } from './components/StepStage'
 import SplashScreen from './components/SplashScreen'
 import Toast from './components/Toast'
+import { generateRecipesFromAI } from './api/recipes'
 import { useAmbientMotion } from './hooks/useMotion'
-import { generateRecipes, subtractIngredients } from './utils/recipes'
+import { subtractIngredients } from './utils/recipes'
 import {
   getHistory,
   getIngredients,
@@ -86,6 +88,7 @@ function AppContent({ guardados }) {
   function handleOnboarding(chosenTools) {
     setTools(chosenTools)
     setToolsState(chosenTools)
+    goToStep('compose')
     setToast('Herramientas guardadas en este dispositivo')
     setHistory(
       pushHistory({
@@ -96,20 +99,21 @@ function AppContent({ guardados }) {
     )
   }
 
-  function handleGenerate({ types, note }) {
+  async function handleGenerate({ types, note }) {
     setGenerating(true)
-    window.setTimeout(() => {
-      const batch = generateRecipes({
+    try {
+      const batch = await generateRecipesFromAI({
         ingredients,
         types,
         tools: tools || [],
+        note,
+        count: 4,
       })
       setRecipes(batch)
       setLastQuery({ types, note })
       setUsedId(null)
       setLockedIds(new Set())
       goToStep('results')
-      setGenerating(false)
       setToast('Listo: 4 propuestas nuevas')
       setHistory(
         pushHistory({
@@ -118,10 +122,14 @@ function AppContent({ guardados }) {
           label: `Generó 4 recetas · ${types.join(', ')}`,
         }),
       )
-    }, 450)
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : 'No se pudieron generar recetas.')
+    } finally {
+      setGenerating(false)
+    }
   }
 
-  function handleRegenerate() {
+  async function handleRegenerate() {
     if (!lastQuery) return
     const protectedRecipes = recipes.filter((r) => lockedIds.has(r.id))
     const need = 4 - protectedRecipes.length
@@ -131,15 +139,16 @@ function AppContent({ guardados }) {
     }
 
     setRegenerating(true)
-    window.setTimeout(() => {
-      const fresh = generateRecipes({
+    try {
+      const fresh = await generateRecipesFromAI({
         ingredients,
         types: lastQuery.types,
         tools: tools || [],
-      }).slice(0, need)
+        note: lastQuery.note,
+        count: need,
+      })
 
       setRecipes([...protectedRecipes, ...fresh].slice(0, 4))
-      setRegenerating(false)
       setToast(
         protectedRecipes.length
           ? `Regeneradas ${need}. ${protectedRecipes.length} guardada(s) intactas`
@@ -152,7 +161,11 @@ function AppContent({ guardados }) {
           label: 'Regeneró ideas (guardadas intactas)',
         }),
       )
-    }, 400)
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : 'No se pudieron regenerar recetas.')
+    } finally {
+      setRegenerating(false)
+    }
   }
 
   function handleSave(recipe) {
@@ -294,6 +307,9 @@ function AppContent({ guardados }) {
  
       <Toast message={toast} onDone={clearToast} raised={step === 'results'} />
       {showSplash && <SplashScreen onFinish={finishSplash} />}
+            {(generating || regenerating) && (
+        <AnimatedLoading mode={regenerating ? 'regenerate' : 'generate'} />
+      )}
     </div>
   )
 }
