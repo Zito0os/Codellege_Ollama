@@ -22,10 +22,13 @@ MAX_IMAGE_SIZE = 10 * 1024 * 1024
 MAX_IMAGE_DIMENSION = 1280
 VISION_MODEL = "llama3.2-vision:11b"
 VISION_PROMPT = (
-    "Identifica todos los alimentos e ingredientes que se distingan claramente en la imagen. "
-    "Incluye frutas, verduras, carnes y otros alimentos; omite recipientes y objetos. "
-    "Devuelve únicamente los nombres breves en español solicitados por la estructura, "
-    "sin explicaciones ni conjeturas."
+    "Eres un sistema de inventario visual de alimentos. Examina únicamente lo que se ve "
+    "en la foto: recorre el refrigerador de arriba abajo y cada estante de izquierda a "
+    "derecha; inspecciona también los cajones. Devuelve nombres concretos de alimentos "
+    "en español, sin repetir un tipo aunque haya varias piezas. No uses categorías "
+    "generales como fruta, verdura, carne o lácteo. No infieras el contenido de recipientes "
+    "opacos ni alimentos que suelen guardarse en un refrigerador. Omite lo que no puedas "
+    "identificar visualmente con confianza. No añadas explicaciones ni inventes alimentos."
 )
 MAX_ITEMS_PER_ANALYSIS = 20
 VISION_FORMAT = {
@@ -89,10 +92,15 @@ def normalizar_alimento(alimento: str) -> str:
         "green apples": "manzana",
         "manzana verde": "manzana",
         "manzanas verdes": "manzana",
+        "avocado": "aguacate",
+        "avocados": "aguacate",
         "banana": "platano",
         "bananas": "platano",
         "platanos": "platano",
         "broccoli": "brocoli",
+        "cauliflower": "coliflor",
+        "cauliflowers": "coliflor",
+        "cauliflor": "coliflor",
         "bell pepper": "pimiento",
         "bell peppers": "pimiento",
         "red bell pepper": "pimiento",
@@ -119,6 +127,8 @@ def normalizar_alimento(alimento: str) -> str:
         "pollo crudo": "pollo",
         "carrot": "zanahoria",
         "carrots": "zanahoria",
+        "carrota": "zanahoria",
+        "carrotas": "zanahoria",
         "zanahoria": "zanahoria",
         "zanahorias": "zanahoria",
         "cherry tomato": "tomate",
@@ -139,6 +149,10 @@ def normalizar_alimento(alimento: str) -> str:
         "onions": "cebolla",
         "white onion": "cebolla",
         "white onions": "cebolla",
+        "green onion": "cebolla",
+        "green onions": "cebolla",
+        "scallion": "cebollin",
+        "scallions": "cebollin",
         "cebollas blancas": "cebolla",
         "cebolla roja": "cebolla",
         "cebolla morada": "cebolla",
@@ -149,6 +163,37 @@ def normalizar_alimento(alimento: str) -> str:
         "lettuce": "lechuga",
         "lettuces": "lechuga",
         "lechugas": "lechuga",
+        "milk": "leche",
+        "whole milk": "leche",
+        "egg": "huevo",
+        "eggs": "huevo",
+        "cheese": "queso",
+        "butter": "mantequilla",
+        "yogurt": "yogur",
+        "yoghurt": "yogur",
+        "grape": "uva",
+        "grapes": "uva",
+        "green grapes": "uva",
+        "blueberry": "arandano",
+        "blueberries": "arandano",
+        "corn": "maiz",
+        "sweetcorn": "maiz",
+        "maize": "maiz",
+        "potato": "papa",
+        "potatoes": "papa",
+        "cucumber": "pepino",
+        "cucumbers": "pepino",
+        "bread": "pan",
+        "fish": "pescado",
+        "sausage": "salchicha",
+        "sausages": "salchicha",
+        "ham": "jamon",
+        "peach": "durazno",
+        "peaches": "durazno",
+        "orange juice": "jugo de naranja",
+        "jam": "mermelada",
+        "marmalade": "mermelada",
+        "marmelada": "mermelada",
         "fresa": "fresa",
         "fresas": "fresa",
         "strawberry": "fresa",
@@ -338,17 +383,26 @@ def formatear_resultado(alimentos: list[str]) -> str:
             "más cercana y nítida."
         )
     nombres = {
+        "arandano": "arándano",
+        "aguacate": "aguacate",
         "berenjena": "berenjena",
         "brocoli": "brócoli",
         "calabacin": "calabacín",
         "champinon": "champiñón",
+        "cebollin": "cebollín",
+        "coliflor": "coliflor",
+        "durazno": "durazno",
         "fresa": "fresa",
+        "jamon": "jamón",
+        "maiz": "maíz",
         "naranja": "naranja",
+        "papa": "papa",
         "pina": "piña",
         "platano": "plátano",
         "repollo": "repollo",
         "salmon": "salmón",
         "zanahoria": "zanahoria",
+        "uva": "uva",
     }
     return (
         "Alimentos identificables con certeza:\n"
@@ -364,19 +418,18 @@ async def consultar_imagen(
 ) -> list[str]:
     opciones = {
         "num_ctx": 4096,
-        "num_predict": 128,
+        "num_predict": 192,
         "temperature": 0,
         "repeat_penalty": 1.1,
     }
     prompt = VISION_PROMPT
-    if contexto_global:
-        ingredientes_globales = ", ".join(contexto_global)
+    if contexto_global is not None:
         prompt += (
-            "\nLa imagen adjunta es un recorte de detalle. En la imagen completa ya "
-            f"se reconocieron: {ingredientes_globales}. Confirma alimentos claramente "
-            "visibles en este recorte, incluidos los pequeños; no repitas un elemento "
-            "que sea el mismo objeto ya reconocido y no descartes alimentos diferentes "
-            "por pertenecer a la misma clase."
+            "\nLa imagen adjunta es un recorte de detalle de la misma fotografía. "
+            "Examina únicamente lo que aparece dentro del recorte e identifica alimentos "
+            "pequeños que pudieron pasar inadvertidos en la vista general. No enumeres "
+            "alimentos que no se vean en este recorte ni infieras su contenido por el "
+            "contexto del refrigerador."
         )
 
     respuesta = await run_in_threadpool(
@@ -397,13 +450,13 @@ async def consultar_imagen(
         f"modelo={VISION_MODEL} done={respuesta.done} reason={respuesta.done_reason} "
         f"content_chars={len(texto)} preview={texto[:180]!r}"
     )
-    if respuesta.done_reason == "length":
-        raise RuntimeError(f"{VISION_MODEL} agotó el límite de tokens de salida.")
     if not texto:
         raise RuntimeError(f"{VISION_MODEL} no devolvió una respuesta final.")
     try:
         datos = json.loads(texto)
     except json.JSONDecodeError:
+        if respuesta.done_reason == "length":
+            raise RuntimeError(f"{VISION_MODEL} agotó el límite de tokens de salida.")
         return extraer_alimentos(texto)
     if (
         not isinstance(datos, dict)
@@ -411,6 +464,11 @@ async def consultar_imagen(
         or not all(isinstance(alimento, str) for alimento in datos["alimentos"])
     ):
         raise RuntimeError(f"{VISION_MODEL} devolvió una respuesta estructurada inválida.")
+    if respuesta.done_reason == "length":
+        print(
+            f"[Vision advertencia] {VISION_MODEL} alcanzó num_predict; "
+            "se usarán únicamente los alimentos del JSON completo."
+        )
     return extraer_alimentos(", ".join(datos["alimentos"]))
 
 

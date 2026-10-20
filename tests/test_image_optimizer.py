@@ -41,6 +41,7 @@ def config(strategy: str, **overrides: object) -> OptimizationConfig:
         "quality_threshold": 0.55,
         "supplement_threshold": 0.55,
         "min_region_size": 64,
+        "region_fallback_edge_threshold": 0.06,
         "denoise_enabled": False,
     }
     values.update(overrides)
@@ -109,6 +110,20 @@ class ImageOptimizerTests(unittest.TestCase):
         self.assertGreater(result.noise_level, 10)
         self.assertFalse(result.uses_regions)
         self.assertEqual(result.regions, ())
+
+    def test_regions_strategy_falls_back_to_bands_for_distributed_detail(self) -> None:
+        grid = np.indices((480, 640)).sum(axis=0) // 16 % 2
+        pixels = np.repeat((grid * 180 + 35).astype(np.uint8)[:, :, None], 3, axis=2)
+        output = BytesIO()
+        Image.fromarray(pixels).save(output, format="PNG")
+
+        result = prepare_image(
+            output.getvalue(),
+            config("regions", max_crops=3, min_region_size=64),
+        )
+
+        self.assertTrue(result.uses_regions)
+        self.assertEqual(len(result.regions), 3)
 
 
 if __name__ == "__main__":

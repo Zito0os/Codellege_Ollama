@@ -36,6 +36,7 @@ class OptimizationConfig:
     quality_threshold: float
     supplement_threshold: float
     min_region_size: int
+    region_fallback_edge_threshold: float
     denoise_enabled: bool
 
     @classmethod
@@ -60,6 +61,9 @@ class OptimizationConfig:
                 "VISION_SUPPLEMENT_THRESHOLD", 0.62, 0.0, 1.0
             ),
             min_region_size=_env_int("VISION_MIN_REGION_SIZE", 96, 32, 1024),
+            region_fallback_edge_threshold=_env_float(
+                "VISION_REGION_FALLBACK_EDGE_THRESHOLD", 0.06, 0.0, 1.0
+            ),
             denoise_enabled=denoise_setting in {"true", "1", "yes"},
         )
 
@@ -209,7 +213,23 @@ def _candidate_boxes(
     for box in mapped:
         if all(_intersection_over_union(box, kept) < 0.55 for kept in selected):
             selected.append(box)
-    return selected
+    if selected:
+        return selected
+    edge_density = float(np.mean(edges > 0))
+    if (
+        config.strategy == "regions"
+        and edge_density > config.region_fallback_edge_threshold
+    ):
+        return [
+            (
+                0,
+                round(original_height * index / 3),
+                original_width,
+                round(original_height * (index + 1) / 3),
+            )
+            for index in range(3)
+        ]
+    return []
 
 
 def _make_region(
