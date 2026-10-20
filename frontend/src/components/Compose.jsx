@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { analyzeIngredientsFromImage } from '../api/images'
 import { UNITS } from '../data/options'
 import { normalizeKey } from '../utils/normalize'
+
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
 const cuisineImages = Object.fromEntries(
   Object.entries(
@@ -90,6 +93,7 @@ export default function Compose({
   generating,
 }) {
   const list = ingredients.map(normalizeItem)
+  const ingredientsRef = useRef(ingredients.map(normalizeItem))
   const [name, setName] = useState('')
   const [qty, setQty] = useState('1')
   const [unit, setUnit] = useState('piezas')
@@ -100,9 +104,13 @@ export default function Compose({
   const [editingId, setEditingId] = useState(null)
   const [photoName, setPhotoName] = useState('')
   const [photoError, setPhotoError] = useState('')
+  const [photoStatus, setPhotoStatus] = useState('')
+  const [analyzingPhoto, setAnalyzingPhoto] = useState(false)
 
   function persist(next) {
-    onIngredientsChange(next.map(normalizeItem))
+    const normalized = next.map(normalizeItem)
+    ingredientsRef.current = normalized
+    onIngredientsChange(normalized)
   }
 
   function addIngredient(e) {
@@ -213,8 +221,11 @@ export default function Compose({
     removeIngredient(id)
   }
 
-  function onPhotoSelected(event) {
+  async function onPhotoSelected(event) {
     const file = event.target.files?.[0]
+    event.target.value = ''
+    setPhotoError('')
+    setPhotoStatus('')
     if (!file) {
       setPhotoName('')
       return
@@ -222,11 +233,59 @@ export default function Compose({
     if (!file.type.startsWith('image/')) {
       setPhotoName('')
       setPhotoError('Selecciona un archivo de imagen.')
-      event.target.value = ''
       return
     }
+    if (file.size > MAX_IMAGE_SIZE) {
+      setPhotoError('La imagen debe pesar menos de 10 MB.')
+      return
+    }
+
     setPhotoError('')
+    setPhotoStatus('')
     setPhotoName(file.name)
+    setAnalyzingPhoto(true)
+
+    try {
+      const detectedIngredients = await analyzeIngredientsFromImage(file)
+      if (!detectedIngredients.length) {
+        setPhotoStatus('No se detectaron ingredientes con suficiente certeza.')
+        return
+      }
+
+      const next = [...ingredientsRef.current]
+      let added = 0
+      let increased = 0
+      for (const detectedName of detectedIngredients) {
+        const key = normalizeKey(detectedName)
+        const existing = next.find((item) => normalizeKey(item.name) === key)
+        if (existing) {
+          const currentQty = Number.parseFloat(String(existing.qty).replace(',', '.')) || 0
+          const nextQty = String(currentQty + 1)
+          Object.assign(existing, {
+            qty: nextQty,
+            amount: `${nextQty} ${existing.unit}`,
+          })
+          increased += 1
+        } else {
+          next.push({
+            id: makeId(),
+            name: titleCase(detectedName),
+            qty: '1',
+            unit: 'piezas',
+            amount: '1 piezas',
+          })
+          added += 1
+        }
+      }
+      persist(next)
+      setPhotoStatus(
+        `Análisis listo: ${added} ingrediente(s) agregado(s) y ${increased} cantidad(es) aumentada(s).`,
+      )
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : 'No se pudo analizar la imagen.')
+    } finally {
+      setAnalyzingPhoto(false)
+    }
   }
 
   function toggleType(label) {
@@ -272,21 +331,25 @@ export default function Compose({
       <div className="compose__split">
         <article className="panel panel--lite panel--receipt">
           <h2>Ingredientes</h2>
-          <p className="helper">Agrega a mano lo que hay en el refri.</p>
+          <p className="helper">Agrega a mano o sube una imagen para detectar ingredientes.</p>
 
           <div className="photo-upload">
             <label className="btn btn--soft photo-upload__label">
-              Subir imagen
+              {analyzingPhoto ? 'Analizando imagen…' : 'Subir imagen'}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 onChange={onPhotoSelected}
+                disabled={analyzingPhoto}
               />
             </label>
             <p className="helper photo-upload__name">
               {photoName || 'Ninguna imagen seleccionada'}
             </p>
           </div>
+          {photoStatus ? (
+            <p className="helper" role="status" aria-live="polite">{photoStatus}</p>
+          ) : null}
           {photoError ? <p className="field__error">{photoError}</p> : null}
 
           <form className="row-form row-form--ings" onSubmit={addIngredient}>
