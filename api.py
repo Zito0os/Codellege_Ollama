@@ -1,11 +1,16 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image
 from pydantic import BaseModel, Field
 from ollama import chat
 
+from Analisis_imagen import MAX_IMAGE_SIZE, router as vision_router
+from image_optimizer import prepare_image
 from recipe_llm import generate_recipes_with_ollama
 
 app = FastAPI()
+app.include_router(vision_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -91,3 +96,52 @@ def generate_recipes(request: GenerateRecipesRequest):
             status_code=500,
             detail="No se pudieron generar recetas con Ollama. Revisa que el servicio esté activo.",
         ) from error
+
+
+@app.post("/imagen/optimizar")
+async def optimizar_imagen(imagen: UploadFile = File(...)):
+    """Prepara una imagen con el optimizador, sin enviarla al modelo de visión."""
+    if not imagen.content_type or not imagen.content_type.startswith("image/"):
+        raise HTTPException(status_code=415, detail="Selecciona un archivo de imagen válido.")
+
+    contenido = await imagen.read(MAX_IMAGE_SIZE + 1)
+    if len(contenido) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=413, detail="La imagen debe pesar menos de 10 MB.")
+    if not contenido:
+        raise HTTPException(status_code=400, detail="El archivo de imagen está vacío.")
+
+    try:
+        preparada = await run_in_threadpool(prepare_image, contenido)
+    except (OSError, ValueError, Image.DecompressionBombError) as error:
+        raise HTTPException(
+            status_code=400,
+            detail="No se pudo leer la imagen. Prueba con un JPG o PNG válido.",
+        ) from error
+
+    return {
+        "original": {
+            "width": preparada.original_width,
+            "height": preparada.original_height,
+        },
+        "optimized": {
+            "width": preparada.full_width,
+            "height": preparada.full_height,
+            "bytes": len(preparada.full_image),
+        },
+        "inspection": {
+            "width": preparada.inspection_width,
+            "height": preparada.inspection_height,
+        },
+        "quality_score": preparada.quality_score,
+        "noise_level": preparada.noise_level,
+        "complement_score": preparada.complement_score,
+        "uses_regions": preparada.uses_regions,
+        "regions": [
+            {
+                "coordinates": list(region.coordinates),
+                "width": region.width,
+                "height": region.height,
+            }
+            for region in preparada.regions
+        ],
+    }

@@ -98,6 +98,8 @@ export default function Compose({
   const [note, setNote] = useState('')
   const [ingError, setIngError] = useState('')
   const [editingId, setEditingId] = useState(null)
+  const [photoName, setPhotoName] = useState('')
+  const [photoError, setPhotoError] = useState('')
 
   function persist(next) {
     onIngredientsChange(next.map(normalizeItem))
@@ -211,6 +213,22 @@ export default function Compose({
     removeIngredient(id)
   }
 
+  function onPhotoSelected(event) {
+    const file = event.target.files?.[0]
+    if (!file) {
+      setPhotoName('')
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      setPhotoName('')
+      setPhotoError('Selecciona un archivo de imagen.')
+      event.target.value = ''
+      return
+    }
+    setPhotoError('')
+    setPhotoName(file.name)
+  }
+
   function toggleType(label) {
     if (types.includes(label)) {
       setTypes(types.filter((t) => t !== label))
@@ -255,6 +273,21 @@ export default function Compose({
         <article className="panel panel--lite panel--receipt">
           <h2>Ingredientes</h2>
           <p className="helper">Agrega a mano lo que hay en el refri.</p>
+
+          <div className="photo-upload">
+            <label className="btn btn--soft photo-upload__label">
+              Subir imagen
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={onPhotoSelected}
+              />
+            </label>
+            <p className="helper photo-upload__name">
+              {photoName || 'Ninguna imagen seleccionada'}
+            </p>
+          </div>
+          {photoError ? <p className="field__error">{photoError}</p> : null}
 
           <form className="row-form row-form--ings" onSubmit={addIngredient}>
             <label className="field field--name">

@@ -7,7 +7,7 @@ import time
 import unicodedata
 from io import BytesIO
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import APIRouter, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
 from PIL import Image, ImageOps
@@ -18,6 +18,7 @@ import ollama
 from image_optimizer import PreparedImage, prepare_image
 
 app = FastAPI()
+router = APIRouter()
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
 MAX_IMAGE_DIMENSION = 1280
 VISION_MODEL = "llama3.2-vision:11b"
@@ -642,7 +643,7 @@ def ask_llama(request: PromptRequest):
         raise HTTPException(status_code=500, detail="Error al procesar la solicitud con el modelo de lenguaje.")
 
 
-@app.post("/analizar")
+@router.post("/analizar")
 async def analizar(imagen: UploadFile = File(...)):
     """Endpoint para analizar una imagen con el único modelo de visión configurado."""
     if not imagen.content_type or not imagen.content_type.startswith("image/"):
@@ -677,7 +678,7 @@ async def analizar(imagen: UploadFile = File(...)):
     return {"resultado": formatear_resultado(alimentos)}
 
 
-@app.post("/analizar/stream")
+@router.post("/analizar/stream")
 async def analizar_stream(imagen: UploadFile = File(...)):
     """Endpoint streaming con el único modelo de visión configurado."""
     if not imagen.content_type or not imagen.content_type.startswith("image/"):
@@ -727,4 +728,7 @@ async def analizar_stream(imagen: UploadFile = File(...)):
         media_type="application/x-ndjson",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+app.include_router(router)
     
