@@ -1,7 +1,14 @@
 import { useEffect, useRef } from 'react'
 import AsistenteReceta from './AsistenteReceta'
 
-export default function RecipeDetail({ recipe, onClose, onSave, onUse, saved, used }) {
+export default function RecipeDetail({
+  recipe,
+  onClose,
+  onSave,
+  onUse,
+  saved,
+  used,
+}) {
   const closeRef = useRef(null)
   const sheetRef = useRef(null)
 
@@ -13,6 +20,7 @@ export default function RecipeDetail({ recipe, onClose, onSave, onUse, saved, us
     document.body.style.overflow = 'hidden'
 
     function onKey(e) {
+      if (sheetRef.current?.querySelector('.recipe-assistant[data-open="true"]')) return
       if (e.key === 'Escape') onClose()
       if (e.key !== 'Tab' || !sheetRef.current) return
       const focusables = sheetRef.current.querySelectorAll(
@@ -56,8 +64,6 @@ export default function RecipeDetail({ recipe, onClose, onSave, onUse, saved, us
             <span>{recipe.difficulty}</span>
           </div>
 
-          <AsistenteReceta key={recipe.id} recipe={recipe} />
-
           <h3>Ingredientes</h3>
           <ul className="detail-ings">
             {recipe.ingredients.map((ing) => (
@@ -82,6 +88,7 @@ export default function RecipeDetail({ recipe, onClose, onSave, onUse, saved, us
             <button type="button" className="btn btn--soft btn--solid" onClick={() => onUse(recipe)} disabled={used}>
               {used ? 'Usada' : 'Usar esta'}
             </button>
+            <AsistenteReceta key={recipe.id} recipe={recipe} />
           </div>
         </div>
 

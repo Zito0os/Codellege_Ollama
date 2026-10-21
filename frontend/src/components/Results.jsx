@@ -1,5 +1,4 @@
 import { useReveal } from '../hooks/useMotion'
-import Microfono from './Microfono'
 
 export default function RecipeCard({ recipe, saved, used, onOpen, onSave, onUse }) {
   return (
@@ -91,8 +90,6 @@ export function Results({
           </button>
         </div>
       </header>
-
-      <Microfono />
 
       <div className="results__grid results__grid--compact">
         {recipes.map((recipe) => (
