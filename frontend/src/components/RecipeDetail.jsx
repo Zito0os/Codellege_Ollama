@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import AsistenteReceta from './AsistenteReceta'
 
 export default function RecipeDetail({ recipe, onClose, onSave, onUse, saved, used }) {
   const closeRef = useRef(null)
@@ -54,6 +55,8 @@ export default function RecipeDetail({ recipe, onClose, onSave, onUse, saved, us
             <span>{recipe.time}</span>
             <span>{recipe.difficulty}</span>
           </div>
+
+          <AsistenteReceta key={recipe.id} recipe={recipe} />
 
           <h3>Ingredientes</h3>
           <ul className="detail-ings">
