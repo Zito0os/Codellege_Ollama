@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { analyzeIngredientsFromImage } from '../api/images'
+import mascotImage from '../assets/mascota-tigre.png'
 import { UNITS } from '../data/options'
 import { normalizeKey } from '../utils/normalize'
 
@@ -83,6 +84,46 @@ function IconClose() {
   )
 }
 
+function PhotographerAnimation() {
+  return (
+    <svg
+      className="photographer-scene__art"
+      viewBox="0 0 320 160"
+      aria-hidden="true"
+      focusable="false"
+    >
+        <rect width="320" height="160" rx="18" fill="#fff4e8" />
+        <circle cx="64" cy="43" r="18" fill="#ffe1bd" />
+        <path d="M28 130h264" stroke="#e8c8a7" strokeWidth="2" strokeLinecap="round" />
+        <g className="photographer-scene__subject">
+          <rect x="45" y="52" width="93" height="65" rx="8" fill="#fffaf5" stroke="#e8c8a7" strokeWidth="2" />
+          <path d="M61 100h61M68 96l16-18 11 11 10-13 17 20" fill="none" stroke="#d98b4a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="112" cy="67" r="5" fill="#f4a261" />
+        </g>
+        <g className="photographer-scene__person">
+          <image href={mascotImage} x="204" y="14" width="115" height="120" />
+        </g>
+        <g className="photographer-scene__camera">
+          <path d="M190 64h39a5 5 0 0 1 5 5v25h-49V69a5 5 0 0 1 5-5z" fill="#593c35" />
+          <path d="M199 64l5-8h13l5 8" fill="#805449" />
+          <circle cx="210" cy="81" r="12" fill="#fff4e8" />
+          <circle cx="210" cy="81" r="7" fill="#d98b4a" />
+          <g className="photographer-scene__flash">
+            <rect x="206.5" y="57" width="7" height="6" rx="1.2" fill="#f3bd62" stroke="#593c35" strokeWidth="1.2" />
+            <rect x="208" y="58.2" width="4" height="3.5" rx=".7" fill="#fff8d7" />
+            <path
+              d="M210 48v4m-6-2 2 3m10-3-2 3m-10 4h3m8 0h3"
+              fill="none"
+              stroke="#d87900"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+            />
+          </g>
+        </g>
+    </svg>
+  )
+}
+
 export default function Compose({
   tools,
   ingredients,
@@ -94,6 +135,7 @@ export default function Compose({
 }) {
   const list = ingredients.map(normalizeItem)
   const ingredientsRef = useRef(ingredients.map(normalizeItem))
+  const photoInputRef = useRef(null)
   const [name, setName] = useState('')
   const [qty, setQty] = useState('1')
   const [unit, setUnit] = useState('piezas')
@@ -103,9 +145,18 @@ export default function Compose({
   const [ingError, setIngError] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [photoName, setPhotoName] = useState('')
+  const [photoPreview, setPhotoPreview] = useState('')
   const [photoError, setPhotoError] = useState('')
   const [photoStatus, setPhotoStatus] = useState('')
   const [analyzingPhoto, setAnalyzingPhoto] = useState(false)
+  const [entryMode, setEntryMode] = useState('photo')
+
+  useEffect(
+    () => () => {
+      if (photoPreview) URL.revokeObjectURL(photoPreview)
+    },
+    [photoPreview],
+  )
 
   function persist(next) {
     const normalized = next.map(normalizeItem)
@@ -243,6 +294,7 @@ export default function Compose({
     setPhotoError('')
     setPhotoStatus('')
     setPhotoName(file.name)
+    setPhotoPreview(URL.createObjectURL(file))
     setAnalyzingPhoto(true)
 
     try {
@@ -288,6 +340,13 @@ export default function Compose({
     }
   }
 
+  function clearPhoto() {
+    setPhotoPreview('')
+    setPhotoName('')
+    setPhotoError('')
+    setPhotoStatus('')
+  }
+
   function toggleType(label) {
     if (types.includes(label)) {
       setTypes(types.filter((t) => t !== label))
@@ -331,64 +390,143 @@ export default function Compose({
       <div className="compose__split">
         <article className="panel panel--lite panel--receipt">
           <h2>Ingredientes</h2>
-          <p className="helper">Agrega a mano o sube una imagen para detectar ingredientes.</p>
+          <p className="helper">Detecta ingredientes con una foto o agrégalos manualmente.</p>
 
-          <div className="photo-upload">
-            <label className="btn btn--soft photo-upload__label">
-              {analyzingPhoto ? 'Analizando imagen…' : 'Subir imagen'}
+          <div className="entry-tabs" role="group" aria-label="Cómo agregar ingredientes">
+            <button
+              type="button"
+              aria-pressed={entryMode === 'photo'}
+              className={`entry-tab ${entryMode === 'photo' ? 'entry-tab--on' : ''}`}
+              onClick={() => setEntryMode('photo')}
+            >
+              Foto
+            </button>
+            <button
+              type="button"
+              aria-pressed={entryMode === 'manual'}
+              className={`entry-tab ${entryMode === 'manual' ? 'entry-tab--on' : ''}`}
+              onClick={() => setEntryMode('manual')}
+            >
+              Manual
+            </button>
+          </div>
+
+          {entryMode === 'photo' ? (
+            <div className="photo-entry">
               <input
+                ref={photoInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif"
+                capture="environment"
+                className="sr-only"
                 onChange={onPhotoSelected}
                 disabled={analyzingPhoto}
+                aria-label="Elegir una foto de ingredientes"
               />
-            </label>
-            <p className="helper photo-upload__name">
-              {photoName || 'Ninguna imagen seleccionada'}
-            </p>
-          </div>
-          {photoStatus ? (
-            <p className="helper" role="status" aria-live="polite">{photoStatus}</p>
-          ) : null}
-          {photoError ? <p className="field__error">{photoError}</p> : null}
 
-          <form className="row-form row-form--ings" onSubmit={addIngredient}>
-            <label className="field field--name">
-              <span>Qué tienes</span>
-              <input
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value)
-                  setIngError('')
-                }}
-                placeholder="Jamón"
-              />
-            </label>
-            <label className="field field--qty">
-              <span>Cant.</span>
-              <input
-                inputMode="decimal"
-                value={qty}
-                onChange={(e) => setQty(e.target.value)}
-                placeholder="1"
-              />
-            </label>
-            <label className="field field--unit">
-              <span>Unidad</span>
-              <select value={unit} onChange={(e) => setUnit(e.target.value)}>
-                {UNITS.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="submit" className="btn btn--soft btn--solid btn--add" aria-label="Añadir">
-              +
-            </button>
-          </form>
+              <button
+                type="button"
+                className="photo-drop"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={analyzingPhoto}
+                aria-label={photoPreview ? 'Elegir otra foto' : 'Subir o tomar una foto'}
+              >
+                {photoPreview ? (
+                  <img
+                    src={photoPreview}
+                    alt={`Vista previa: ${photoName}`}
+                    className="photo-drop__img"
+                  />
+                ) : (
+                  <>
+                    <PhotographerAnimation />
+                    <span className="photo-drop__placeholder">
+                      <strong>Sube o toma una foto</strong>
+                      <span>La IA detectará los ingredientes para sugerirte recetas.</span>
+                    </span>
+                  </>
+                )}
+              </button>
 
-          {ingError ? <p className="field__error">{ingError}</p> : null}
+              <div className="photo-entry__actions">
+                <button
+                  type="button"
+                  className="btn btn--soft btn--solid"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={analyzingPhoto}
+                >
+                  {analyzingPhoto
+                    ? 'Analizando imagen…'
+                    : photoPreview
+                      ? 'Elegir otra foto'
+                      : 'Elegir foto'}
+                </button>
+                {photoPreview ? (
+                  <button
+                    type="button"
+                    className="btn btn--soft"
+                    onClick={clearPhoto}
+                    disabled={analyzingPhoto}
+                  >
+                    Quitar foto
+                  </button>
+                ) : null}
+              </div>
+              {photoName ? <p className="helper photo-upload__name">{photoName}</p> : null}
+              {photoStatus ? (
+                <p className="helper" role="status" aria-live="polite">{photoStatus}</p>
+              ) : null}
+              {analyzingPhoto ? (
+                <p className="helper" role="status" aria-live="polite">
+                  Analizando la foto y buscando ingredientes…
+                </p>
+              ) : null}
+              {photoError ? <p className="field__error" role="alert">{photoError}</p> : null}
+            </div>
+          ) : (
+            <div>
+              <form className="row-form row-form--ings" onSubmit={addIngredient}>
+                <label className="field field--name">
+                  <span>Qué tienes</span>
+                  <input
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      setIngError('')
+                    }}
+                    placeholder="Jamón"
+                  />
+                </label>
+                <label className="field field--qty">
+                  <span>Cant.</span>
+                  <input
+                    inputMode="decimal"
+                    value={qty}
+                    onChange={(e) => setQty(e.target.value)}
+                    placeholder="1"
+                  />
+                </label>
+                <label className="field field--unit">
+                  <span>Unidad</span>
+                  <select value={unit} onChange={(e) => setUnit(e.target.value)}>
+                    {UNITS.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="submit"
+                  className="btn btn--soft btn--solid btn--add"
+                  aria-label="Añadir"
+                >
+                  +
+                </button>
+              </form>
+              {ingError ? <p className="field__error">{ingError}</p> : null}
+            </div>
+          )}
 
           <ul className="ing-list">
             {list.map((item) => {
@@ -461,7 +599,7 @@ export default function Compose({
                 </li>
               )
             })}
-            {!list.length && <li className="empty">Agrega lo que hay en el refri.</li>}
+              {!list.length && <li className="empty">Agrega lo que hay en el refri.</li>}
           </ul>
         </article>
 
