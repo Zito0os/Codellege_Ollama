@@ -1677,78 +1677,12 @@ img {
   overflow-wrap: anywhere;
 }
 
-.photographer-scene__art {
-  position: relative;
-  flex: 0 1 auto;
+.photo-placeholder__icon {
   display: block;
-  width: min(100%, 320px);
-  height: auto;
+  width: 56px;
+  height: 42px;
   margin: 0 auto;
-  object-fit: contain;
-  opacity: 1;
   pointer-events: none;
-}
-
-.photographer-scene__person {
-  transform-box: fill-box;
-  transform-origin: center bottom;
-  animation: photographer-breathe 1.8s ease-in-out infinite;
-}
-
-.photographer-scene__camera {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: camera-snap 2.4s ease-in-out infinite;
-}
-
-.photographer-scene__flash {
-  opacity: 0.25;
-  transform-box: fill-box;
-  transform-origin: center;
-  filter: drop-shadow(0 0 8px rgba(243, 165, 28, 1));
-  animation: camera-flash 2.4s ease-in-out infinite;
-}
-
-@keyframes photographer-breathe {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  48% {
-    transform: translateY(-2px);
-  }
-}
-
-@keyframes camera-snap {
-  0%,
-  43%,
-  67%,
-  100% {
-    transform: rotate(0);
-  }
-  48%,
-  61% {
-    transform: rotate(-5deg) translateY(-1px);
-  }
-}
-
-@keyframes camera-flash {
-  0%,
-  36%,
-  76%,
-  100% {
-    opacity: 0.25;
-    transform: scale(0.65);
-  }
-  43%,
-  70% {
-    opacity: 1;
-    transform: scale(1.7);
-  }
-  54% {
-    opacity: 0.82;
-    transform: scale(1.05);
-  }
 }
 
 .ing-chip__name-input {
@@ -2694,11 +2628,6 @@ img {
     animation: recipe-pan-reduced-motion 2.4s ease-in-out infinite !important;
   }
 
-  .photographer-scene__flash {
-    filter: drop-shadow(0 0 7px rgba(243, 165, 28, 0.9));
-    animation: camera-flash-reduced-motion 2.4s ease-in-out infinite !important;
-  }
-
   @keyframes recipe-pan-reduced-motion {
     0%,
     100% {
@@ -2709,22 +2638,4 @@ img {
     }
   }
 
-  @keyframes camera-flash-reduced-motion {
-    0%,
-    34%,
-    78%,
-    100% {
-      opacity: 0.3;
-      transform: scale(0.65);
-    }
-    42%,
-    69% {
-      opacity: 1;
-      transform: scale(1.5);
-    }
-    54% {
-      opacity: 0.8;
-      transform: scale(1);
-    }
-  }
 }

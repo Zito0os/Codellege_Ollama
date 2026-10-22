@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { analyzeIngredientsFromImage } from '../api/images'
-import mascotImage from '../assets/mascota-tigre.png'
 import { UNITS } from '../data/options'
 import { normalizeKey } from '../utils/normalize'
 
@@ -84,42 +83,17 @@ function IconClose() {
   )
 }
 
-function PhotographerAnimation() {
+function PhotoPlaceholderIcon() {
   return (
     <svg
-      className="photographer-scene__art"
-      viewBox="0 0 320 160"
+      className="photo-placeholder__icon"
+      viewBox="0 0 64 48"
       aria-hidden="true"
       focusable="false"
     >
-        <rect width="320" height="160" rx="18" fill="#fff4e8" />
-        <circle cx="64" cy="43" r="18" fill="#ffe1bd" />
-        <path d="M28 130h264" stroke="#e8c8a7" strokeWidth="2" strokeLinecap="round" />
-        <g className="photographer-scene__subject">
-          <rect x="45" y="52" width="93" height="65" rx="8" fill="#fffaf5" stroke="#e8c8a7" strokeWidth="2" />
-          <path d="M61 100h61M68 96l16-18 11 11 10-13 17 20" fill="none" stroke="#d98b4a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="112" cy="67" r="5" fill="#f4a261" />
-        </g>
-        <g className="photographer-scene__person">
-          <image href={mascotImage} x="204" y="14" width="115" height="120" />
-        </g>
-        <g className="photographer-scene__camera">
-          <path d="M190 64h39a5 5 0 0 1 5 5v25h-49V69a5 5 0 0 1 5-5z" fill="#593c35" />
-          <path d="M199 64l5-8h13l5 8" fill="#805449" />
-          <circle cx="210" cy="81" r="12" fill="#fff4e8" />
-          <circle cx="210" cy="81" r="7" fill="#d98b4a" />
-          <g className="photographer-scene__flash">
-            <rect x="206.5" y="57" width="7" height="6" rx="1.2" fill="#f3bd62" stroke="#593c35" strokeWidth="1.2" />
-            <rect x="208" y="58.2" width="4" height="3.5" rx=".7" fill="#fff8d7" />
-            <path
-              d="M210 48v4m-6-2 2 3m10-3-2 3m-10 4h3m8 0h3"
-              fill="none"
-              stroke="#d87900"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-            />
-          </g>
-        </g>
+      <rect x="3" y="3" width="58" height="42" rx="8" fill="#fff4e8" stroke="#e8c8a7" strokeWidth="2" />
+      <circle cx="44" cy="16" r="4" fill="#f4a261" />
+      <path d="m10 37 13-13 8 8 6-6 13 11H10Z" fill="#f4a261" />
     </svg>
   )
 }
@@ -439,7 +413,7 @@ export default function Compose({
                   />
                 ) : (
                   <>
-                    <PhotographerAnimation />
+                    <PhotoPlaceholderIcon />
                     <span className="photo-drop__placeholder">
                       <strong>Sube o toma una foto</strong>
                       <span>La IA detectará los ingredientes para sugerirte recetas.</span>
